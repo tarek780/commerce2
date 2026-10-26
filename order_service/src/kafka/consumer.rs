@@ -1,6 +1,6 @@
-use rdkafka::consumer::{CommitMode, Consumer, StreamConsumer};
 use rdkafka::ClientConfig;
 use rdkafka::Message;
+use rdkafka::consumer::{CommitMode, Consumer, StreamConsumer};
 use serde::Deserialize;
 use std::sync::Arc;
 use tracing::{error, info, warn};

@@ -21,7 +21,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use tonic::transport::Server;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::config::OrderConfig;
 use crate::pb_order::order_service_server::OrderServiceServer;

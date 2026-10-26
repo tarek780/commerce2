@@ -4,9 +4,8 @@ use std::sync::Arc;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
 
-use crate::error::OrderError;
 use crate::order::orchestrator;
-use crate::order::repo::{OrderItemRow, OrderRepo, OrderRow};
+use crate::order::repo::{OrderRepo, OrderRow};
 use crate::pb_order::order_service_server::OrderService;
 use crate::pb_order::*;
 use crate::state::AppState;
@@ -103,10 +102,11 @@ impl OrderService for OrderSvc {
         let id = &req.into_inner().order_id;
         let row = OrderRepo::get(&self.state.db, id.as_str()).await?;
 
-        let payment_id = row
-            .payment_id
-            .clone()
-            .ok_or_else(|| Status::failed_precondition("no payment for order"))?;
+        // let payment_id = row
+        //     .payment_id
+        //     .clone()
+        //     .ok_or_else(|| Status::failed_precondition("no payment for order"))?;
+
         let payment = self
             .state
             .payment

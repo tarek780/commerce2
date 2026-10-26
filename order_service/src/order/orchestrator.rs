@@ -21,10 +21,13 @@ pub async fn create_and_orchestrate(
     items: Vec<NewItem>,
     idempotency_key: &str,
 ) -> Result<OrderRow, OrderError> {
+    /// This function starts by creating the request and sending it to the order DB and setting the status to pending.
+    ///Afterwards, it sends a reservation request to the inventory_service. If successful, it changes the order status from pending to reserved.
+    ///Then, it sends a request to the payment service. If successful, it changes the order status from reserved to awaiting.
     if items.is_empty() {
         return Err(OrderError::InvalidState("empty items".into()));
     }
-
+    // first = add to db
     let mut total = BigDecimal::from(0);
     for it in &items {
         total += &it.unit_price * BigDecimal::from(it.quantity);
@@ -52,6 +55,7 @@ pub async fn create_and_orchestrate(
         .collect();
 
     OrderRepo::insert(&state.db, &row, &items_for_db).await?;
+    // seconde = send to inventory_service
     // reservation
     let mut reservation_id = String::new();
     let ttl = state.config.order_ttl_secs;
@@ -65,6 +69,7 @@ pub async fn create_and_orchestrate(
             Ok((rid, _)) => {
                 reservation_id = rid;
             }
+
             Err(status) => {
                 warn!(variant_id = it.variant_id, %status, "inventory reserve failed");
                 let _ = OrderRepo::transition(
@@ -84,6 +89,8 @@ pub async fn create_and_orchestrate(
         }
     }
 
+    // send to payment_service
+
     // 3) reserved
     let row = OrderRepo::transition(
         &state.db,
@@ -97,8 +104,7 @@ pub async fn create_and_orchestrate(
         serde_json::json!({"reservation_id": reservation_id}),
     )
     .await?;
-
-    // 4) اطلب دفع
+    //
     match state
         .payment
         .create(
@@ -144,12 +150,12 @@ pub async fn create_and_orchestrate(
                 serde_json::json!({"reason": status.message()}),
             )
             .await;
+            //
             Err(OrderError::Payment(status.message().to_string()))
         }
     }
 }
 
-/// إلغاء الطلب (من المستخدم أو من expiry worker)
 pub async fn cancel(
     state: &AppState,
     order_id: &str,
@@ -164,11 +170,9 @@ pub async fn cancel(
         return Err(OrderError::InvalidState(row.status));
     }
 
-    // ألغِ الدفع إن وُجد
     if let Some(pid) = &row.payment_id {
         let _ = state.payment.cancel(pid, reason).await;
     }
-    // حرّر المخزون
     if let Some(rid) = &row.reservation_id {
         let _ = state.inventory.release(rid).await;
     }
@@ -187,7 +191,6 @@ pub async fn cancel(
     .await
 }
 
-/// عند نجاح الدفع من Kafka: commit inventory + confirmed
 pub async fn confirm_after_payment(
     state: &AppState,
     order_id: &str,
@@ -201,7 +204,6 @@ pub async fn confirm_after_payment(
         return Err(OrderError::InvalidState("payment_id mismatch".into()));
     }
 
-    // التزام المخزون نهائياً
     if let Some(rid) = &row.reservation_id {
         state
             .inventory
@@ -224,7 +226,6 @@ pub async fn confirm_after_payment(
     .await
 }
 
-/// عند فشل الدفع: حرّر المخزون + failed
 pub async fn fail_after_payment(
     state: &AppState,
     order_id: &str,

@@ -1,0 +1,46 @@
+syntax = "proto3";
+package order.v1;
+
+service OrderService {
+  rpc CreateOrder     (CreateOrderRequest)     returns (OrderResponse);
+  rpc GetOrder        (GetOrderRequest)        returns (OrderResponse);
+  rpc CancelOrder     (CancelOrderRequest)     returns (OrderResponse);
+  rpc PayOrder        (PayOrderRequest)        returns (PayOrderResponse);
+}
+
+message OrderItem {
+  int32 variant_id = 1;
+  int32 quantity   = 2;
+  string unit_price = 3;      // decimal as string
+}
+
+message CreateOrderRequest {
+  string customer_id = 1;
+  string currency    = 2;
+  repeated OrderItem items = 3;
+  string idempotency_key = 4;
+}
+
+message GetOrderRequest    { string order_id = 1; }
+message CancelOrderRequest { string order_id = 1; string reason = 2; }
+message PayOrderRequest    { string order_id = 1; }
+
+message OrderResponse {
+  string id = 1;
+  string customer_id = 2;
+  string status = 3;            // pending|reserved|awaiting_payment|paid|confirmed|failed|cancelled
+  string total_amount = 4;
+  string currency = 5;
+  string reservation_id = 6;
+  string payment_id = 7;
+  string created_at = 8;
+  string updated_at = 9;
+  optional string failure_reason = 10;
+}
+
+message PayOrderResponse {
+  string order_id = 1;
+  string payment_id = 2;
+  string payment_url = 3;
+  string status = 4;
+}

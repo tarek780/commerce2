@@ -1,0 +1,55 @@
+syntax = "proto3";
+package inventory.v1;
+
+service InventoryService {
+  rpc Reserve(ReserveRequest) returns (ReserveResponse);
+  rpc Release(ReleaseRequest) returns (ReleaseResponse);
+  rpc Commit(CommitRequest) returns (CommitResponse);
+  rpc GetStock(GetStockRequest) returns (GetStockResponse);
+  rpc AdjustStock(AdjustStockRequest) returns (AdjustStockResponse);
+  rpc WatchStock(WatchStockRequest) returns (stream StockUpdate);
+}
+
+message ReserveRequest {
+  string reservation_key = 1;
+  int32 variant_id = 2;
+  int32 quantity = 3;
+  int64 ttl_seconds = 4;
+}
+message ReserveResponse {
+  string reservation_id = 1;
+  int32 variant_id = 2;
+  int32 quantity = 3;
+  int64 expires_at_unix = 4;
+}
+
+message ReleaseRequest { string reservation_id = 1; }
+message ReleaseResponse { bool released = 1; }
+message CommitRequest { string reservation_id = 1; }
+message CommitResponse { bool committed = 1; }
+
+message GetStockRequest { int32 variant_id = 1; }
+message GetStockResponse {
+  int32 stock_quantity = 1;
+  int32 reserved_quantity = 2;
+  int32 available_quantity = 3;
+}
+
+message AdjustStockRequest {
+  int32 variant_id = 1;
+  int32 delta = 2;
+  string reference_id = 3;
+}
+message AdjustStockResponse { int32 new_stock_quantity = 1; }
+
+message WatchStockRequest {
+  repeated int32 variant_ids = 1;
+  int32 low_stock_threshold = 2;
+}
+message StockUpdate {
+  int32 variant_id = 1;
+  int32 available_quantity = 2;
+  int32 reserved_quantity = 3;
+  string event_type = 4;
+  int64 updated_at_unix = 5;
+}

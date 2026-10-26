@@ -1,0 +1,150 @@
+version: '3.8'
+
+services:
+  # Core Infrastructure Services
+
+  postgres:
+    image: postgres:16.15-alpine3.24
+    container_name: pgdb_container
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+      POSTGRES_DB: mydb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:alpine3.23
+    container_name: redis_container
+    restart: unless-stopped
+    command: redis-server --requirepass myredispassword --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+
+  kafka:
+    image: apache/kafka:latest
+    container_name: kafka_container
+    restart: unless-stopped
+    ports:
+      - "9092:9092"
+      - "9094:9094"
+    environment:
+      # 
+      - KAFKA_NODE_ID=1
+      - KAFKA_PROCESS_ROLES=broker,controller
+      - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+      # 
+      - KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      - KAFKA_LOG_DIRS=/var/lib/kafka/data
+    volumes:
+      - kafkadata:/var/lib/kafka/data
+
+  # Microservices Applications
+
+  auth_service:
+    build:
+      context: ./auth_service
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      - SECRET_KEY=your_super_secret_key_here
+      - BIND_ADDRESS=0.0.0.0:3000
+      - DATABASE_URL=postgres://myuser:mypassword@postgres:5432/mydb?sslmode=disable
+      - REDIS_URL=redis://:myredispassword@redis:6379
+
+  category_service:
+    build:
+      context: ./category_service
+      dockerfile: Dockerfile
+    ports:
+      - "4000:4000"
+    depends_on:
+      - postgres
+      - inventory_service
+    environment:
+      - BIND_ADDRESS=0.0.0.0:4000
+      - DATABASE_URL=postgres://myuser:mypassword@postgres:5432/mydb?sslmode=disable
+      - REDIS_URL=redis://:myredispassword@redis:6379
+      - INVENTORY_GRPC_URL=inventory_service:8000
+      - SECRET_KEY=your_super_secret_key_here
+
+  cart_service:
+    build:
+      context: ./cart_service
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      - BIND_ADDRESS=0.0.0.0:5000
+      - REDIS_URL=redis://:myredispassword@redis:6379
+      - DATABASE_URL=postgres://myuser:mypassword@postgres:5432/mydb?sslmode=disable
+      - SECRET_KEY=your_super_secret_key_here
+
+  payment_service:
+    build:
+      context: ./payment_service
+      dockerfile: Dockerfile
+    ports:
+      - "6000:6000"
+    depends_on:
+      - postgres
+      - kafka
+    environment:
+      - DATABASE_URL=postgres://myuser:mypassword@postgres:5432/mydb?sslmode=disable
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - GRPC_ADDR=0.0.0.0:6001
+      - HTTP_ADDR=0.0.0.0:6000            
+    
+  order_service:
+    build:
+      context: ./order_service
+      dockerfile: Dockerfile
+    ports:
+      - "7000:7000"
+    depends_on:
+      - postgres
+      - kafka
+      - inventory_service
+      - payment_service
+    environment:
+      - DATABASE_URL=postgres://myuser:mypassword@postgres:5432/mydb?sslmode=disable
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - BIND_ADDRESS=0.0.0.0:7000
+      - INVENTORY_GRPC_URL=inventory_service:8000
+      - PAYMENT_GRPC_URL=payment_service:6001
+   
+  inventory_service:
+    build:
+      context: ./inventory_service
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+    environment:
+      - BIND_ADDRESS=0.0.0.0:8000
+      - DATABASE_URL=postgres://myuser:mypassword@postgres:5432/mydb?sslmode=disable
+
+volumes:
+  pgdata:
+    driver: local
+  redisdata:
+    driver: local
+  kafkadata:
+    driver: local

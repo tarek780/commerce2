@@ -1,0 +1,33 @@
+syntax = "proto3";
+package payment.v1;
+
+service PaymentService {
+  rpc CreatePayment(CreatePaymentRequest) returns (PaymentResponse);
+  rpc GetPayment(GetPaymentRequest) returns (PaymentResponse);
+  rpc CancelPayment(CancelPaymentRequest) returns (PaymentResponse);
+  rpc RefundPayment(RefundPaymentRequest) returns (PaymentResponse);
+}
+
+message CreatePaymentRequest {
+  string order_id = 1;
+  string amount = 2;
+  string currency = 3;
+  string idempotency_key = 4;
+  string customer_id = 5;
+  map<string, string> metadata = 6;
+}
+message GetPaymentRequest { string payment_id = 1; }
+message CancelPaymentRequest { string payment_id = 1; string reason = 2; }
+message RefundPaymentRequest { string payment_id = 1; string amount = 2; string reason = 3; }
+message PaymentResponse {
+  string id = 1;
+  string order_id = 2;
+  string status = 3;
+  string amount = 4;
+  string currency = 5;
+  string gateway_reference = 6;
+  string payment_url = 7;
+  string created_at = 8;
+  string updated_at = 9;
+  optional string failure_reason = 10;
+}

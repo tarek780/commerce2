@@ -1,5 +1,5 @@
 
-use crate::error::CartError;
+use crate::error::AppError;
 use axum::{
     extract::Request,
     http::{StatusCode, header},
@@ -28,10 +28,21 @@ impl Not for Typ {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Copy)]
 pub(crate) enum Role {
     Admin,
     User,
+}
+
+
+impl Not for Role {
+    type Output = Self;
+    fn not(self) -> Self::Output {
+        match self {
+            Self::Admin => Self::User,
+            Self::User => Self::Admin,
+        }
+    }
 }
 
 // Decode
@@ -45,7 +56,7 @@ pub(crate) struct DecodedToken {
 }
 
 impl DecodedToken {
-    pub(crate) fn decode_jwt(token: &str) -> Result<Self, CartError> {
+    pub(crate) fn decode_jwt(token: &str) -> Result<Self, AppError> {
         let secret = std::env::var("SECRET_KEY")?;
         let validation = Validation::new(Algorithm::HS256);
         let decoded = decode::<Self>(
@@ -125,5 +136,5 @@ where
 #[derive(Clone, Debug)]
 pub(crate) struct AccessToken {
     pub(crate) user_id: String,
-    role: Role,
+    pub(crate) role: Role,
 }

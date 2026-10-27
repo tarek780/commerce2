@@ -24,6 +24,7 @@ use crate::state::AppState;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    dotenvy::dotenv().ok();
     tracing_subscriber::registry()
         .with(
             EnvFilter::try_from_default_env()
@@ -31,7 +32,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .with(tracing_subscriber::fmt::layer().json())
         .init();
-    dotenvy::dotenv().ok();
 
     let cfg = PaymentConfig::from_env().await?;
     let state = Arc::new(AppState::new(cfg.clone()).await?);

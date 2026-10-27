@@ -1,4 +1,4 @@
-// config.rs
+
 use crate::error::PaymentError;
 #[derive(Debug, Clone)]
 pub struct PaymentConfig {

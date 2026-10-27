@@ -23,7 +23,7 @@ impl AppConfig {
             redis_consumer_name: std::env::var("REDIS_CONSUMER_NAME")
                 .unwrap_or_else(|_| "worker-1".into()),
             inventory_grpc_url: env("INVENTORY_GRPC_URL")?,
-            http_addr: std::env::var("BIND_ADDRESS").unwrap_or_else(|_| "0.0.0.0:8084".into()),
+            bind_addr: std::env::var("BIND_ADDRESS").unwrap_or_else(|_| "0.0.0.0:8084".into()),
             index_products: std::env::var("REDIS_INDEX_PRODUCTS")
                 .unwrap_or_else(|_| "catalog:products:idx".into()),
             index_categories: std::env::var("REDIS_INDEX_CATEGORIES")

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Core Infrastructure Services
 
@@ -12,7 +10,7 @@ services:
       POSTGRES_PASSWORD: mypassword
       POSTGRES_DB: mydb
     ports:
-      - "5432:5432"
+      - "5433:5433"
     volumes:
       - pgdata:/var/lib/postgresql/data
 
@@ -109,7 +107,10 @@ services:
       - DATABASE_URL=postgres://myuser:mypassword@postgres:5432/mydb?sslmode=disable
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - GRPC_ADDR=0.0.0.0:6001
-      - HTTP_ADDR=0.0.0.0:6000            
+      - HTTP_ADDR=0.0.0.0:6000       
+      # payment gateway configuration
+      - PAYMENT_GATEWAY=mock
+      - GATEWAY_PUBLIC_BASE=http://localhost:6000/pay     
     
   order_service:
     build:

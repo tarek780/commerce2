@@ -1,4 +1,4 @@
-// payment-service/src/state.rs
+
 use sqlx::PgPool;
 use std::sync::Arc;
 
@@ -10,7 +10,7 @@ use crate::payment::kafka_publisher::KafkaPublisher;
 pub struct AppState {
     pub db: PgPool,
     pub gateway: Arc<dyn PaymentGateway>,
-    pub kafka: Option<Arc<KafkaPublisher>>, // ← جديد
+    pub kafka: Option<Arc<KafkaPublisher>>, 
     pub config: Arc<PaymentConfig>,
 }
 

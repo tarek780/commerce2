@@ -1,4 +1,3 @@
-// src/main.rs
 mod auth;
 mod cart;
 mod error;

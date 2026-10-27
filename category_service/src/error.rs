@@ -21,6 +21,13 @@ pub enum AppError {
     Grpc(String),
     #[error("Internal: {0}")]
     Internal(String),
+
+    #[error("JWT: {0}")]
+    Jwt(#[from] jsonwebtoken::errors::Error),
+    #[error("Env: {0}")]
+    Env(#[from] std::env::VarError),
+    #[error("Other: {0}")]
+    Other(String),
 }
 
 pub type AppResult<T> = Result<T, AppError>;

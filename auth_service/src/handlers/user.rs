@@ -1,18 +1,19 @@
-use axum::{Json, extract::State};
+use axum::{Extension, Json, extract::State};
 use std::sync::Arc;
 
+use crate::middleware::auth_layer::*;
 use crate::{
     db::user_repo,
     dto::auth::{MeResponse, UpdateMeRequest},
     error::AppError,
     helpers::validation,
-    middleware::auth_layer::AuthUser,
     state::AppState,
 };
 
+#[tracing::instrument(skip(state), fields(user_id = %user_id))]
 pub async fn get_me(
     State(state): State<Arc<AppState>>,
-    AuthUser { user_id }: AuthUser,
+    Extension(AccessToken { user_id }): Extension<AccessToken>,
 ) -> Result<Json<MeResponse>, AppError> {
     let user = user_repo::find_by_id(&state.pool, &user_id.as_str())
         .await?
@@ -27,9 +28,10 @@ pub async fn get_me(
     }))
 }
 
+#[tracing::instrument(skip(state), fields(user_id = %user_id))]
 pub async fn update_me(
     State(state): State<Arc<AppState>>,
-    AuthUser { user_id }: AuthUser,
+    Extension(AccessToken { user_id }): Extension<AccessToken>,
     Json(payload): Json<UpdateMeRequest>,
 ) -> Result<Json<MeResponse>, AppError> {
     validation::validate(&payload)?;

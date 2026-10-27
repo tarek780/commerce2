@@ -27,12 +27,6 @@ pub enum AppError {
     #[error("database error")]
     Database(#[from] sqlx::Error),
 
-    #[error("Tonic error")]
-    Tonic(#[from] tonic::transport::Error),
-
-    #[error("Tonic Status")]
-    TonicStatus(#[from] tonic::Status),
-
     #[error("password hashing error")]
     PasswordHash(#[from] argon2::Error),
 
@@ -77,19 +71,6 @@ impl IntoResponse for AppError {
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "internal server error".to_string(),
                 )
-            }
-
-            AppError::Tonic(e) => {
-                tracing::error!("Tonic error: {:?}", e);
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "internal server error".to_string(),
-                )
-            }
-
-            AppError::TonicStatus(e) => {
-                tracing::info!("Tonic Status: {:?}", e);
-                (StatusCode::ACCEPTED, "TonicStatus ".to_string())
             }
 
             AppError::PasswordHash(e) => {

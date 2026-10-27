@@ -2,7 +2,7 @@ pub mod context;
 pub mod mutation;
 pub mod pagination;
 pub mod query;
-pub mod scalars;
+
 pub mod schema;
 pub mod types;
 

@@ -1,5 +1,4 @@
-
-use crate::error::CartError;
+use crate::error::AppError;
 use axum::{
     extract::Request,
     http::{StatusCode, header},
@@ -13,7 +12,7 @@ use std::ops::Not;
 use tower::{Layer, Service};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Copy)]
-pub(crate) enum Typ {
+pub enum Typ {
     Access,
     Refresh,
 }
@@ -29,23 +28,23 @@ impl Not for Typ {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
-pub(crate) enum Role {
+pub enum Role {
     Admin,
     User,
 }
 
 // Decode
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct DecodedToken {
-    pub(crate) typ: Typ,
-    pub(crate) user_id: String,
-    pub(crate) token_id: String,
-    pub(crate) role: Role,
-    pub(crate) exp: i64,
+pub struct DecodedToken {
+    pub typ: Typ,
+    pub user_id: String,
+    pub token_id: String,
+    pub role: Role,
+    pub exp: i64,
 }
 
 impl DecodedToken {
-    pub(crate) fn decode_jwt(token: &str) -> Result<Self, CartError> {
+    pub fn decode_jwt(token: &str) -> Result<Self, AppError> {
         let secret = std::env::var("SECRET_KEY")?;
         let validation = Validation::new(Algorithm::HS256);
         let decoded = decode::<Self>(
@@ -58,7 +57,7 @@ impl DecodedToken {
 }
 
 #[derive(Clone)]
-pub(crate) struct AuthLayer {}
+pub struct AuthLayer {}
 
 impl<S> Layer<S> for AuthLayer {
     type Service = AuthService<S>;
@@ -68,7 +67,7 @@ impl<S> Layer<S> for AuthLayer {
 }
 
 #[derive(Clone)]
-pub(crate) struct AuthService<S> {
+pub struct AuthService<S> {
     inner: S,
 }
 
@@ -122,6 +121,6 @@ where
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct AccessToken {
-    pub(crate) user_id: String,
+pub struct AccessToken {
+    pub user_id: String,
 }

@@ -2,10 +2,9 @@ mod config;
 mod db;
 mod dto;
 mod error;
-
 mod handlers;
 mod helpers;
-
+mod middleware;
 mod models;
 mod routes;
 mod state;

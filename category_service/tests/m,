@@ -1,0 +1,21 @@
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
+tower = { version = "0.5", features = ["util"] }
+uuid = { version = "1", features = ["v7", "serde"] }
+bigdecimal = { version = "0.4", features = ["serde"] }
+
+# Unit only (no services needed)
+cargo test
+
+# Redis tests (Redis Stack with RediSearch + RedisJSON + Streams)
+docker run -d --name redis-test -p 6379:6379 redis/redis-stack:latest
+TEST_REDIS_URL=redis://127.0.0.1:6379 cargo test -- --include-ignored
+
+# Postgres tests
+docker run -d --name pg-test -p 5432:5432 \
+  -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=catalog_test postgres:16
+TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/catalog_test \
+  cargo test -- --include-ignored
+
+# All
+TEST_DATABASE_URL=... TEST_REDIS_URL=... cargo test -- --include-ignored --test-threads=1

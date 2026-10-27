@@ -17,7 +17,9 @@ COPY migrations ./migrations
 COPY src ./src
 
 
-RUN touch src/main.rs && cargo build --release
+RUN touch src/main.rs 
+RUN cargo test -- --test-threads=1
+RUN cargo build --release
 
 
 FROM debian:trixie-slim

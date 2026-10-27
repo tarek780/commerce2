@@ -3,6 +3,10 @@ name = "category_service"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "category_service"
+path = "src/main.rs"
+
 [dependencies]
 # Web / GraphQL
 axum = { version = "0.8", features = ["macros"] }

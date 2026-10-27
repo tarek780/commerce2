@@ -34,7 +34,7 @@ impl Config {
             database_url: get("DATABASE_URL")?,
             redis_url: get("REDIS_URL")?,
 
-            secret_key: get_secret("SECRSECRET_KEY")?,
+            secret_key: get_secret("SECRET_KEY")?,
             jwt_access_expiry_secs: parse_duration_secs(&get("JWT_ACCESS_EXPIRY")?)?,
             jwt_refresh_expiry_secs: parse_duration_secs(&get("JWT_REFRESH_EXPIRY")?)?,
             jwt_issuer: get("JWT_ISSUER")?,

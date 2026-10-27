@@ -1,0 +1,31 @@
+name : Run Docker Compose
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Compose
+        uses: docker/setup-docker@v1
+
+      - name: start services with docker compose
+        run: | 
+          docker-compose -f docker-compose.yml up -d
+
+      - name: verify services are running
+        run: |
+          docker-compose -f docker-compose.yml ps
+
+      - name: Stop services with docker compose
+        run: |
+          docker-compose -f docker-compose.yml down

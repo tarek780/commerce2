@@ -1,0 +1,58 @@
+[package]
+name = "storefront-service"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# Web
+axum = { version = "0.7", features = ["macros", "json"] }
+tower-http = { version = "0.5", features = ["trace", "cors", "request-id"] }
+
+# Async
+tokio = { version = "1", features = ["full", "test-util"] }
+
+# gRPC
+tonic = "0.14"
+tonic-prost = "0.14"
+prost = "0.14"
+
+# HTTP client (cart, category)
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+
+# Redis (idempotency)
+redis = { version = "0.25", features = ["tokio-comp", "connection-manager"] }
+
+# DTO / Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v7", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+bigdecimal = { version = "0.4", features = ["serde"] }
+
+# Errors / Logging
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+dotenvy = "0.15"
+
+# OpenAPI
+utoipa = { version = "4", features = ["axum_extras", "chrono", "uuid"] }
+utoipa-swagger-ui = { version = "7", features = ["axum"] }
+
+# Utils
+async-trait = "0.1"
+base64 = "0.22"
+
+tower = { version = "0.5", features = ["util"] }
+jsonwebtoken = "11.1.0"
+futures-util = "0.3.34"
+
+[build-dependencies]
+tonic-prost-build = "0.14"
+
+
+[dev-dependencies]
+http-body-util = "0.1"
+testcontainers = "0.20"
+testcontainers-modules = { version = "0.8", features = ["postgres", "redis"] }
+

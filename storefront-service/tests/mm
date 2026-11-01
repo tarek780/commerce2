@@ -1,0 +1,27 @@
+Box::pin(async move {
+    match DecodedToken::decode_jwt(&token) {
+        Ok(token_data) => {
+            // ✅ التحقق من نوع التوكن
+            if token_data.typ != Typ::Access {
+                return Ok(StatusCode::UNAUTHORIZED.into_response());
+            }
+            let data = AccessToken {
+                user_id: token_data.user_id,
+            };
+            req.extensions_mut().insert(data);
+            inner.call(req).await
+        }
+        Err(_) => Ok(StatusCode::UNAUTHORIZED.into_response()),
+    }
+})
+//
+#[tokio::test]
+async fn refresh_token_rejected_on_protected_routes() {
+    let h = common::harness().await;
+    let token = auth::refresh_token_for(USER_ID);
+    let (status, _, _) = get_json(
+        &h.app, "/api/v1/orders",
+        &[("authorization", &auth::bearer(&token))],
+    ).await;
+    assert_eq!(status, 401);  // ← بعد التصحيح
+}

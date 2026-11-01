@@ -1,0 +1,53 @@
+use redis::aio::ConnectionManager;
+
+
+use testcontainers::{
+    ContainerAsync,
+    core::{Image, ImageExt, IntoContainerPort, WaitFor},
+    runners::AsyncRunner,
+};
+use testcontainers::{ContainerRequest, GenericImage};
+use tokio::io::AsyncWriteExt;
+use tokio::io::stdout;
+
+
+pub async fn setup() -> ConnectionManager {
+
+        unsafe {
+            std::env::set_var("SECRET_KEY", "test-secret-key-32-chars-minimum-xx");
+            std::env::set_var("RUST_LOG", "info");
+            std::env::set_var("RUST_BACKTRACE", "1");
+        }
+
+
+        let redis_image = GenericImage::new("redis", "alpine3.23")
+            .with_wait_for(WaitFor::message_on_stdout("Ready to accept connections"));
+
+        let redis_container = redis_image
+            .start()
+            .await
+            .expect("Failed to start Redis container");
+
+        let redis_host = redis_container.get_host().await.unwrap();
+        let redis_port = match redis_container.get_host_port_ipv4(6379).await {
+            Ok(c) => c,
+            Err(e) => {
+                let _ = stdout()
+                    .write_all(format!("Failed to get Redis container port: {}\n", e).as_bytes())
+                    .await;
+                panic!("Failed to get Redis container port: {}", e);
+            }
+        };
+        let redis_url = format!("redis://{redis_host}:{redis_port}");
+
+        let redis_client = redis::Client::open(redis_url).expect("redis client");
+        let redis = redis::aio::ConnectionManager::new(redis_client)
+            .await
+            .expect("redis conn manager");
+        //
+}
+
+/// Helper to build unique keys for  tests...
+pub fn uniq(prefix: &str) -> String {
+    format!("test:{prefix}:{}", uuid::Uuid::now_v7())
+}

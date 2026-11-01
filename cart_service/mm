@@ -1,0 +1,10 @@
+# بدون خدمات (سيتم تخطي الاختبارات):
+cargo test
+
+# مع خدمات حقيقية:
+docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=pass postgres:16
+docker run -d -p 6379:6379 redis:7
+
+export DATABASE_URL=postgres://postgres:pass@localhost:5432/postgres
+export REDIS_URL=redis://localhost:6379
+cargo test -- --nocapture --test-threads=1

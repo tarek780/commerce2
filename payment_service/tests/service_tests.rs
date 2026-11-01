@@ -2,9 +2,11 @@
 
 mod common;
 
-use payment_service::pb::payment_service_server::PaymentService;
-use payment_service::pb::{CreatePaymentRequest, GetPaymentRequest, CancelPaymentRequest};
 use payment_service::payment::service::PaymentSvc;
+use payment_service::pb::payment_service_server::PaymentService;
+use payment_service::pb::{
+    CancelPaymentRequest, CreatePaymentRequest, GetPaymentRequest, RefundPaymentRequest,
+};
 use tonic::Request;
 
 fn create_req(order: &str, idem: &str) -> CreatePaymentRequest {
@@ -67,7 +69,6 @@ async fn create_payment_idempotency_mismatch_fails() {
         .await
         .unwrap();
 
-
     let err = svc
         .create_payment(Request::new(create_req("order-OTHER", "idem-m")))
         .await
@@ -122,10 +123,11 @@ async fn refund_requires_succeeded_state() {
     let st = common::test_state().await;
     let svc = PaymentSvc::new(st.clone());
 
-
     let created = svc
         .create_payment(Request::new(create_req("order-rf1", "idem-rf1")))
-        .await.unwrap().into_inner();
+        .await
+        .unwrap()
+        .into_inner();
 
     let err = svc
         .refund_payment(Request::new(RefundPaymentRequest {
@@ -133,7 +135,8 @@ async fn refund_requires_succeeded_state() {
             amount: "10.00".into(),
             reason: "test".into(),
         }))
-        .await.unwrap_err();
+        .await
+        .unwrap_err();
 
     assert_eq!(err.code(), tonic::Code::FailedPrecondition);
 }
@@ -146,11 +149,15 @@ async fn refund_succeeded_payment_marks_refunded() {
 
     let created = svc
         .create_payment(Request::new(create_req("order-rf2", "idem-rf2")))
-        .await.unwrap().into_inner();
-
+        .await
+        .unwrap()
+        .into_inner();
 
     sqlx::query("UPDATE payments SET status='succeeded' WHERE id=$1")
-        .bind(&created.id).execute(&st.db).await.unwrap();
+        .bind(&created.id)
+        .execute(&st.db)
+        .await
+        .unwrap();
 
     let refunded = svc
         .refund_payment(Request::new(RefundPaymentRequest {
@@ -158,7 +165,9 @@ async fn refund_succeeded_payment_marks_refunded() {
             amount: "10.00".into(),
             reason: "customer".into(),
         }))
-        .await.unwrap().into_inner();
+        .await
+        .unwrap()
+        .into_inner();
 
     assert_eq!(refunded.status, "refunded");
 }

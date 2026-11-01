@@ -3,9 +3,9 @@ use storefront_service::middleware::auth::{DecodedToken, Role, Typ};
 
 static INIT: Once = Once::new();
 
-///  SECRET_KEY 
+///  SECRET_KEY
 pub fn init_secret_once() {
-    INIT.call_once(|| {
+    INIT.call_once(|| unsafe {
         std::env::set_var("SECRET_KEY", "test-secret-key-for-integration-tests-only");
     });
 }
@@ -34,8 +34,8 @@ pub fn admin_token_for(user_id: &str) -> String {
 }
 
 fn token_with(user_id: &str, typ: Typ, role: Role, exp_offset_secs: i64) -> String {
-    use jsonwebtoken::{EncodingKey, Header, Algorithm};
     use chrono::Utc;
+    use jsonwebtoken::{Algorithm, EncodingKey, Header};
 
     let claims = DecodedToken {
         typ,

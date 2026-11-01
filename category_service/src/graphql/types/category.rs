@@ -4,7 +4,7 @@ use async_graphql::{ComplexObject, Context, ID, Result as GqlResult, SimpleObjec
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-#[derive(SimpleObject)]
+#[derive(Default, SimpleObject)]
 #[graphql(complex)]
 pub struct Category {
     pub id: Uuid,

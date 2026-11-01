@@ -9,7 +9,7 @@ use crate::state::AppState;
 
 #[derive(Debug, Clone)]
 pub struct NewItem {
-    pub variant_id: i32,
+    pub variant_id: Uuid,
     pub quantity: i32,
     pub unit_price: BigDecimal,
 }
@@ -49,7 +49,7 @@ pub async fn create_and_orchestrate(
         updated_at: now,
     };
 
-    let items_for_db: Vec<(i32, i32, BigDecimal)> = items
+    let items_for_db: Vec<(Uuid, i32, BigDecimal)> = items
         .iter()
         .map(|i| (i.variant_id, i.quantity, i.unit_price.clone()))
         .collect();
@@ -71,7 +71,7 @@ pub async fn create_and_orchestrate(
             }
 
             Err(status) => {
-                warn!(variant_id = it.variant_id, %status, "inventory reserve failed");
+                warn!(variant_id = it.variant_id.to_string(), %status, "inventory reserve failed");
                 let _ = OrderRepo::transition(
                     &state.db,
                     &row.id.as_str(),

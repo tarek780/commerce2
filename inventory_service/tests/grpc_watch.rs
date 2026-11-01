@@ -1,12 +1,12 @@
 mod common;
 
-use std::time::Duration;
-
 use inventory_service::inventory::repo::InventoryRepo;
 use inventory_service::inventory::service::InventorySvc;
 use inventory_service::pb::inventory_service_client::InventoryServiceClient;
 use inventory_service::pb::inventory_service_server::InventoryServiceServer;
 use inventory_service::pb::*;
+use std::time::Duration;
+use uuid::Uuid;
 
 use std::sync::Arc;
 use tokio::sync::broadcast;
@@ -37,7 +37,7 @@ async fn spawn(env: &common::TestEnv) -> (Channel, tokio::task::JoinHandle<()>) 
 #[tokio::test]
 async fn watch_receives_reserved_event() {
     let env = require_db!();
-    let vid = common::new_variant_id();
+    let vid = Uuid::now_v7();
     common::seed_inventory(&env.pool, vid, 5).await;
 
     let (channel, handle) = spawn(&env).await;
@@ -45,21 +45,19 @@ async fn watch_receives_reserved_event() {
 
     let mut stream = client
         .watch_stock(WatchStockRequest {
-            variant_ids: vec![vid],
+            variant_ids: vec![vid.to_string()],
             low_stock_threshold: 100,
         })
         .await
         .unwrap()
         .into_inner();
 
-
     tokio::time::sleep(Duration::from_millis(100)).await;
-
 
     let _ = client
         .reserve(ReserveRequest {
             reservation_key: common::new_reservation_key(),
-            variant_id: vid,
+            variant_id: vid.to_string(),
             quantity: 2,
             ttl_seconds: 60,
         })
@@ -72,7 +70,7 @@ async fn watch_receives_reserved_event() {
         .expect("stream error")
         .expect("stream closed");
 
-    assert_eq!(ev.variant_id, vid);
+    assert_eq!(ev.variant_id, vid.to_string());
     assert_eq!(ev.event_type, "reserved");
     assert_eq!(ev.reserved_quantity, 2);
 

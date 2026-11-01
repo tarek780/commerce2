@@ -1,11 +1,11 @@
 mod common;
-
 use inventory_service::error::InventoryError;
+use uuid::Uuid;
 
 #[tokio::test]
 async fn reserve_release_and_available_counts() {
     let env = require_db!();
-    let vid = common::new_variant_id();
+    let vid = Uuid::now_v7();
     common::seed_inventory(&env.pool, vid, 10).await;
 
     let key = common::new_reservation_key();
@@ -23,7 +23,7 @@ async fn reserve_release_and_available_counts() {
     assert_eq!(stock, 10);
     assert_eq!(reserved, 0);
 
-    // release 
+    // release
     let err = env.repo.release(res.id).await.unwrap_err();
     assert!(matches!(err, InventoryError::InvalidState(_)));
 
@@ -33,7 +33,7 @@ async fn reserve_release_and_available_counts() {
 #[tokio::test]
 async fn reserve_insufficient_stock() {
     let env = require_db!();
-    let vid = common::new_variant_id();
+    let vid = Uuid::now_v7();
     common::seed_inventory(&env.pool, vid, 2).await;
 
     let err = env
@@ -52,8 +52,7 @@ async fn reserve_insufficient_stock() {
 #[tokio::test]
 async fn reserve_unknown_variant() {
     let env = require_db!();
-    let vid = common::new_variant_id();
-    // لا نُهيّئ variant
+    let vid = Uuid::now_v7();
     let err = env
         .repo
         .reserve(&common::new_reservation_key(), vid, 1, 60)
@@ -65,7 +64,7 @@ async fn reserve_unknown_variant() {
 #[tokio::test]
 async fn reserve_idempotent_same_params_returns_same_id() {
     let env = require_db!();
-    let vid = common::new_variant_id();
+    let vid = Uuid::now_v7();
     common::seed_inventory(&env.pool, vid, 5).await;
 
     let key = common::new_reservation_key();
@@ -82,7 +81,7 @@ async fn reserve_idempotent_same_params_returns_same_id() {
 #[tokio::test]
 async fn reserve_idempotency_mismatch_rejects() {
     let env = require_db!();
-    let vid = common::new_variant_id();
+    let vid = Uuid::now_v7();
     common::seed_inventory(&env.pool, vid, 5).await;
 
     let key = common::new_reservation_key();

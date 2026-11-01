@@ -1,16 +1,16 @@
 mod common;
 
 use chrono::{Duration, Utc};
-use order_service::order::repo::{OrderRepo, OrderRow};
 use order_service::order::expiry;
+use order_service::order::repo::{OrderRepo, OrderRow};
 use sqlx::types::BigDecimal;
 use std::str::FromStr;
 
 #[tokio::test]
 async fn expire_batch_marks_due_orders_cancelled() {
-    let pool = common::setup_pool().await;
-    common::cleanup(&pool).await;
-    let state = common::setup_state(pool.clone()).await;
+    let state = common::setup_pool().await;
+    common::cleanup(&state.0.clone()).await;
+    let state = common::setup_state(state.0, state.1, state.2).await;
 
     let now = Utc::now();
     let row = OrderRow {
@@ -27,23 +27,23 @@ async fn expire_batch_marks_due_orders_cancelled() {
         created_at: now,
         updated_at: now,
     };
-    OrderRepo::insert(&pool, &row, &[]).await.unwrap();
+    OrderRepo::insert(&state.db, &row, &[]).await.unwrap();
 
     let n = expiry::expire_batch(&state).await.unwrap();
     assert_eq!(n, 1);
 
-    let after = OrderRepo::get(&pool, &row.id).await.unwrap();
+    let after = OrderRepo::get(&state.db, &row.id).await.unwrap();
     assert_eq!(after.status, "cancelled");
     assert_eq!(after.failure_reason.as_deref(), Some("expired_ttl"));
 
-    common::cleanup(&pool).await;
+    common::cleanup(&state.db.clone()).await;
 }
 
 #[tokio::test]
 async fn expire_batch_skips_not_due() {
-    let pool = common::setup_pool().await;
-    common::cleanup(&pool).await;
-    let state = common::setup_state(pool.clone()).await;
+    let state = common::setup_pool().await;
+    common::cleanup(&state.0.clone()).await;
+    let state = common::setup_state(state.0, state.1, state.2).await;
 
     let now = Utc::now();
     let row = OrderRow {
@@ -60,10 +60,10 @@ async fn expire_batch_skips_not_due() {
         created_at: now,
         updated_at: now,
     };
-    OrderRepo::insert(&pool, &row, &[]).await.unwrap();
+    OrderRepo::insert(&state.db, &row, &[]).await.unwrap();
 
     let n = expiry::expire_batch(&state).await.unwrap();
     assert_eq!(n, 0);
 
-    common::cleanup(&pool).await;
+    common::cleanup(&state.db.clone()).await;
 }

@@ -52,7 +52,7 @@ impl OrderRepo {
     pub async fn insert(
         pool: &PgPool,
         row: &OrderRow,
-        items: &[(i32, i32, sqlx::types::BigDecimal)],
+        items: &[(Uuid, i32, sqlx::types::BigDecimal)],
     ) -> Result<(), OrderError> {
         let mut tx = pool.begin().await?;
 

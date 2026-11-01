@@ -11,6 +11,7 @@ use inventory_service::pb::*;
 
 use tokio::sync::broadcast;
 use tonic::transport::{Channel, Server};
+use uuid::Uuid;
 
 async fn spawn_server(env: &common::TestEnv) -> (Channel, tokio::task::JoinHandle<()>) {
     let (tx, _) = broadcast::channel(1024);
@@ -27,7 +28,6 @@ async fn spawn_server(env: &common::TestEnv) -> (Channel, tokio::task::JoinHandl
     let handle = tokio::spawn(async move {
         let _ = server.await;
     });
-
 
     let mut channel = None;
     for _ in 0..50 {
@@ -47,7 +47,7 @@ async fn spawn_server(env: &common::TestEnv) -> (Channel, tokio::task::JoinHandl
 #[tokio::test]
 async fn grpc_reserve_and_get_stock() {
     let env = require_db!();
-    let vid = common::new_variant_id();
+    let vid = Uuid::now_v7();
     common::seed_inventory(&env.pool, vid, 5).await;
 
     let (channel, handle) = spawn_server(&env).await;
@@ -56,19 +56,21 @@ async fn grpc_reserve_and_get_stock() {
     let resp = client
         .reserve(ReserveRequest {
             reservation_key: common::new_reservation_key(),
-            variant_id: vid,
+            variant_id: vid.to_string(),
             quantity: 2,
             ttl_seconds: 60,
         })
         .await
         .unwrap()
         .into_inner();
-    assert_eq!(resp.variant_id, vid);
+    assert_eq!(resp.variant_id, vid.to_string());
     assert_eq!(resp.quantity, 2);
     assert!(resp.expires_at_unix > chrono::Utc::now().timestamp());
 
     let stock = client
-        .get_stock(GetStockRequest { variant_id: vid })
+        .get_stock(GetStockRequest {
+            variant_id: vid.to_string(),
+        })
         .await
         .unwrap()
         .into_inner();
@@ -83,7 +85,7 @@ async fn grpc_reserve_and_get_stock() {
 #[tokio::test]
 async fn grpc_insufficient_stock_maps_to_failed_precondition() {
     let env = require_db!();
-    let vid = common::new_variant_id();
+    let vid = Uuid::now_v7();
     common::seed_inventory(&env.pool, vid, 1).await;
 
     let (channel, handle) = spawn_server(&env).await;
@@ -92,7 +94,7 @@ async fn grpc_insufficient_stock_maps_to_failed_precondition() {
     let err = client
         .reserve(ReserveRequest {
             reservation_key: common::new_reservation_key(),
-            variant_id: vid,
+            variant_id: vid.to_string(),
             quantity: 10,
             ttl_seconds: 60,
         })
@@ -108,13 +110,15 @@ async fn grpc_insufficient_stock_maps_to_failed_precondition() {
 #[tokio::test]
 async fn grpc_unknown_variant_maps_to_not_found() {
     let env = require_db!();
-    let vid = common::new_variant_id();
+    let vid = Uuid::now_v7();
 
     let (channel, handle) = spawn_server(&env).await;
     let mut client = InventoryServiceClient::new(channel);
 
     let err = client
-        .get_stock(GetStockRequest { variant_id: vid })
+        .get_stock(GetStockRequest {
+            variant_id: vid.to_string(),
+        })
         .await
         .unwrap_err();
     assert_eq!(err.code(), tonic::Code::NotFound);
@@ -125,7 +129,7 @@ async fn grpc_unknown_variant_maps_to_not_found() {
 #[tokio::test]
 async fn grpc_commit_and_adjust() {
     let env = require_db!();
-    let vid = common::new_variant_id();
+    let vid = Uuid::now_v7();
     common::seed_inventory(&env.pool, vid, 10).await;
 
     let (channel, handle) = spawn_server(&env).await;
@@ -134,7 +138,7 @@ async fn grpc_commit_and_adjust() {
     let res = client
         .reserve(ReserveRequest {
             reservation_key: common::new_reservation_key(),
-            variant_id: vid,
+            variant_id: vid.to_string(),
             quantity: 3,
             ttl_seconds: 60,
         })
@@ -150,7 +154,9 @@ async fn grpc_commit_and_adjust() {
         .unwrap();
 
     let stock = client
-        .get_stock(GetStockRequest { variant_id: vid })
+        .get_stock(GetStockRequest {
+            variant_id: vid.to_string(),
+        })
         .await
         .unwrap()
         .into_inner();
@@ -159,7 +165,7 @@ async fn grpc_commit_and_adjust() {
 
     let adj = client
         .adjust_stock(AdjustStockRequest {
-            variant_id: vid,
+            variant_id: vid.to_string(),
             delta: 5,
             reference_id: "po-123".into(),
         })

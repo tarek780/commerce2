@@ -20,9 +20,9 @@ impl InventorySvc {
         Self { repo, stock_tx }
     }
 
-    fn emit(&self, variant_id: i32, available: i32, reserved: i32, event_type: &str) {
+    fn emit(&self, variant_id: Uuid, available: i32, reserved: i32, event_type: &str) {
         let _ = self.stock_tx.send(StockUpdate {
-            variant_id,
+            variant_id: variant_id.to_string(),
             available_quantity: available,
             reserved_quantity: reserved,
             event_type: event_type.to_string(),
@@ -42,18 +42,20 @@ impl InventoryService for InventorySvc {
         req: Request<ReserveRequest>,
     ) -> Result<Response<ReserveResponse>, Status> {
         let r = req.into_inner();
+        let variant_id = Uuid::parse_str(&r.variant_id)
+            .map_err(|_| Status::invalid_argument("bad variant_id"))?;
         let res = self
             .repo
-            .reserve(&r.reservation_key, r.variant_id, r.quantity, r.ttl_seconds)
+            .reserve(&r.reservation_key, variant_id, r.quantity, r.ttl_seconds)
             .await?;
 
-        if let Ok((stock, reserved)) = self.repo.get_stock(r.variant_id).await {
-            self.emit(r.variant_id, stock - reserved, reserved, "reserved");
+        if let Ok((stock, reserved)) = self.repo.get_stock(variant_id).await {
+            self.emit(variant_id, stock - reserved, reserved, "reserved");
         }
 
         Ok(Response::new(ReserveResponse {
             reservation_id: res.id.to_string(),
-            variant_id: res.variant_id,
+            variant_id: res.variant_id.to_string(),
             quantity: res.quantity,
             expires_at_unix: res.expires_at.timestamp(),
         }))
@@ -86,7 +88,9 @@ impl InventoryService for InventorySvc {
         req: Request<GetStockRequest>,
     ) -> Result<Response<GetStockResponse>, Status> {
         let r = req.into_inner();
-        let (stock, reserved) = self.repo.get_stock(r.variant_id).await?;
+        let variant_id = Uuid::parse_str(&r.variant_id.as_str())
+            .map_err(|_| Status::invalid_argument("bad variant_id"))?;
+        let (stock, reserved) = self.repo.get_stock(variant_id).await?;
         Ok(Response::new(GetStockResponse {
             stock_quantity: stock,
             reserved_quantity: reserved,
@@ -99,12 +103,14 @@ impl InventoryService for InventorySvc {
         req: Request<AdjustStockRequest>,
     ) -> Result<Response<AdjustStockResponse>, Status> {
         let r = req.into_inner();
+        let variant_id = Uuid::parse_str(&r.variant_id.as_str())
+            .map_err(|_| Status::invalid_argument("bad variant_id"))?;
         let new_stock = self
             .repo
-            .adjust(r.variant_id, r.delta, &r.reference_id)
+            .adjust(variant_id, r.delta, &r.reference_id)
             .await?;
-        if let Ok((_, reserved)) = self.repo.get_stock(r.variant_id).await {
-            self.emit(r.variant_id, new_stock - reserved, reserved, "adjusted");
+        if let Ok((_, reserved)) = self.repo.get_stock(variant_id).await {
+            self.emit(variant_id, new_stock - reserved, reserved, "adjusted");
         }
         Ok(Response::new(AdjustStockResponse {
             new_stock_quantity: new_stock,

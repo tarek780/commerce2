@@ -3,13 +3,16 @@ use category_service::db::impls::variant::VariantRow;
 use category_service::graphql::types::variant::Variant;
 use chrono::Utc;
 use std::str::FromStr;
+use uuid::Uuid;
 
 #[test]
 fn from_row_maps_all_fields() {
     let now = Utc::now();
+    let id = Uuid::now_v7();
+    let parent_id = Uuid::now_v7();
     let row = VariantRow {
-        id: 5,
-        product_id: 2,
+        id: id,
+        product_id: parent_id,
         sku: "SKU-1".into(),
         price: BigDecimal::from_str("19.99").unwrap(),
         compare_at_price: Some(BigDecimal::from_str("29.99").unwrap()),
@@ -20,8 +23,8 @@ fn from_row_maps_all_fields() {
         updated_at: now,
     };
     let v: Variant = row.into();
-    assert_eq!(v.id.0, "5");
-    assert_eq!(v.product_id.0, "2");
+    assert_eq!(v.id.0, id.to_string());
+    assert_eq!(v.product_id.0, parent_id.to_string());
     assert_eq!(v.sku, "SKU-1");
     assert_eq!(v.price, "19.99");
     assert_eq!(v.compare_at_price.as_deref(), Some("29.99"));
@@ -33,9 +36,11 @@ fn from_row_maps_all_fields() {
 #[test]
 fn from_row_handles_optionals_none() {
     let now = Utc::now();
+    let id = Uuid::now_v7();
+    let parent_id = Uuid::now_v7();
     let row = VariantRow {
-        id: 1,
-        product_id: 1,
+        id: id,
+        product_id: parent_id,
         sku: "s".into(),
         price: BigDecimal::from_str("1").unwrap(),
         compare_at_price: None,

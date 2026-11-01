@@ -18,7 +18,9 @@ COPY proto ./proto
 COPY src ./src
 
 
-RUN touch src/main.rs && cargo build --release
+RUN touch src/main.rs 
+RUN cargo test --test-threads=1 --release
+RUN cargo build --release
 
 
 FROM debian:trixie-slim

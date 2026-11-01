@@ -1,5 +1,0 @@
-# مع Postgres فقط (الاختبارات لا تحتاج Redis هنا)
-docker run -d --name inv-pg -p 5432:5432 -e POSTGRES_PASSWORD=pass postgres:16
-
-export DATABASE_URL=postgres://postgres:pass@localhost:5432/postgres
-cargo test -- --nocapture --test-threads=1

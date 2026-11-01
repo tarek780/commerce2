@@ -1,7 +1,7 @@
 use crate::config::AppConfig;
 use crate::error::{AppError, AppResult};
-use redis::aio::ConnectionManager;
 use redis::Value as V;
+use redis::aio::ConnectionManager;
 use serde_json::Value;
 pub async fn ensure_indexes(mgr: &mut ConnectionManager, cfg: &AppConfig) -> AppResult<()> {
     // products index
@@ -150,53 +150,5 @@ fn parse_ft_search(value: V) -> AppResult<Vec<Value>> {
 
     Ok(docs)
 }
-
-//
-
-// pub async fn search_product(
-//     mgr: &mut ConnectionManager,
-//     index: &str,
-//     query: &str,
-//     offset: usize,
-//     limit: usize,
-// ) -> AppResult<JsonFromRedis> {
-//     let (count, result): (i64, Vec<(String, Vec<String>)>) = redis::cmd("FT.SEARCH")
-//         .arg(index)
-//         .arg(query)
-//         .arg("LIMIT")
-//         .arg(offset)
-//         .arg(limit)
-//         .arg("RETURN")
-//         .arg("1")
-//         .arg("$")
-//         .query_async(mgr)
-//         .await?;
-
-//     // for JsonFromRedis
-//     let mut json_vec = Vec::new();
-//     // for JsonFromRedis
-//     let json_couont = json_vec.len();
-
-//     for (_, data) in result {
-//         if let json = data.len() >= 2 {
-//             let json_raw = data[1].as_str();
-//             let json = serde_json::to_string(json_raw)?;
-//             json_vec.push(json);
-//         }
-//     }
-
-//     let data = JsonFromRedis {
-//         all_count: count,
-//         json: json_vec,
-//         json_couont: json_couont as i64,
-//     };
-//     Ok(data)
-// }
-
-// pub(crate) struct JsonFromRedis {
-//     pub(crate) all_count: i64,
-//     pub(crate) json: Vec<String>,
-//     pub(crate) json_couont: i64,
-// }
 
 //

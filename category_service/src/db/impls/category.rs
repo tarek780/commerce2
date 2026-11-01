@@ -18,10 +18,13 @@ pub struct CategoryRow {
 pub struct CategoryRepo;
 
 impl CategoryRepo {
-    pub async fn get(pool: &PgPool, id: Uuid) -> AppResult<CategoryRow> {
-        sqlx::query_as!(CategoryRow, "SELECT * FROM categories WHERE id = $1", id)
-            .fetch_optional(pool)
-            .await?
+    pub async fn get(pool: &PgPool, id: Uuid) -> AppResult<Option<CategoryRow>> {
+        Ok(
+            sqlx::query_as::<_, CategoryRow>("SELECT * FROM categories WHERE id = $1")
+                .bind(id)
+                .fetch_optional(pool)
+                .await?,
+        )
     }
 
     pub async fn list(
@@ -53,12 +56,12 @@ impl CategoryRepo {
             let x = Uuid::parse_str(p)?;
             pid = x
         }
-        let id = sqlx::query_scalar!(
+        let id = sqlx::query_scalar::<_, Uuid>(
             "INSERT INTO categories (name, slug, parent_id) VALUES ($1,$2,$3) RETURNING id",
-            name,
-            slug,
-            pid
         )
+        .bind(name)
+        .bind(slug)
+        .bind(parent_id.map(|p| Uuid::parse_str(p)).transpose()?)
         .fetch_one(pool)
         .await
         .map_err(|e| match e {

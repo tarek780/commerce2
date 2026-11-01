@@ -2,6 +2,7 @@ use crate::pb::StockUpdate;
 use chrono::Utc;
 use sqlx::PgPool;
 use tokio::sync::broadcast;
+use uuid::Uuid;
 
 pub async fn expire_batch(
     pool: &PgPool,
@@ -9,7 +10,7 @@ pub async fn expire_batch(
 ) -> Result<u64, sqlx::Error> {
     let mut db_tx = pool.begin().await?;
 
-    let rows: Vec<(uuid::Uuid, i32, i32)> = sqlx::query_as(
+    let rows: Vec<(uuid::Uuid, Uuid, i32)> = sqlx::query_as(
         r#"SELECT id, variant_id, quantity FROM reservations
            WHERE status = 'pending' AND expires_at < now()
            ORDER BY expires_at LIMIT 100 FOR UPDATE SKIP LOCKED"#,
@@ -29,7 +30,7 @@ pub async fn expire_batch(
             .execute(&mut *db_tx).await?;
 
         let _ = tx.send(StockUpdate {
-            variant_id: *variant_id,
+            variant_id: variant_id.to_string(),
             available_quantity: 0,
             reserved_quantity: 0,
             event_type: "expired".into(),

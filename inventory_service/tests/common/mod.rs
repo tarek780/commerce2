@@ -1,4 +1,3 @@
-
 #![allow(dead_code)]
 
 use std::sync::Arc;
@@ -7,10 +6,9 @@ use std::time::Duration;
 use inventory_service::inventory::repo::InventoryRepo;
 use inventory_service::inventory::service::InventorySvc;
 use inventory_service::pb::StockUpdate;
-use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
+use sqlx::postgres::PgPoolOptions;
 use tokio::sync::broadcast;
-
 
 use testcontainers::{
     ContainerAsync,
@@ -20,6 +18,7 @@ use testcontainers::{
 use testcontainers::{ContainerRequest, GenericImage};
 use tokio::io::AsyncWriteExt;
 use tokio::io::stdout;
+use uuid::Uuid;
 
 pub struct TestEnv {
     pub pool: PgPool,
@@ -28,53 +27,51 @@ pub struct TestEnv {
     pub svc: InventorySvc,
 }
 
-
 pub async fn build_env() -> Option<TestEnv> {
+    unsafe {
+        std::env::set_var("SECRET_KEY", "test-secret-key-32-chars-minimum-xx");
+        std::env::set_var("RUST_LOG", "info");
+        std::env::set_var("RUST_BACKTRACE", "1");
+    }
 
-        unsafe {
-            std::env::set_var("SECRET_KEY", "test-secret-key-32-chars-minimum-xx");
-            std::env::set_var("RUST_LOG", "info");
-            std::env::set_var("RUST_BACKTRACE", "1");
+    let pg_image = GenericImage::new("postgres", "16.15-alpine3.24")
+        .with_wait_for(WaitFor::message_on_stdout(
+            "database system is ready to accept connections",
+        ))
+        .with_env_var("POSTGRES_USER", "myuser")
+        .with_env_var("POSTGRES_PASSWORD", "mypassword")
+        .with_env_var("POSTGRES_DB", "mydb");
+
+    let pg_container = pg_image
+        .start()
+        .await
+        .expect("Failed to start Postgres container");
+
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+
+    let pg_port = match pg_container.get_host_port_ipv4(5432).await {
+        Ok(c) => c,
+        Err(e) => {
+            let _ = stdout()
+                .write_all(format!("Failed to get Postgres container port: {}\n", e).as_bytes())
+                .await;
+            panic!("Failed to get Postgres container port: {}", e);
         }
+    };
 
-        let pg_image = GenericImage::new("postgres", "16.15-alpine3.24")
-            .with_wait_for(WaitFor::message_on_stdout(
-                "database system is ready to accept connections",
-            ))
-            .with_env_var("POSTGRES_USER", "myuser")
-            .with_env_var("POSTGRES_PASSWORD", "mypassword")
-            .with_env_var("POSTGRES_DB", "mydb");
+    let database_url =
+        format!("postgres://myuser:mypassword@127.0.0.1:{pg_port}/mydb?sslmode=disable");
 
-        let pg_container = pg_image
-            .start()
-            .await
-            .expect("Failed to start Postgres container");
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&database_url)
+        .await
+        .expect("connect test postgres");
 
-        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-
-        let pg_port = match pg_container.get_host_port_ipv4(5432).await {
-            Ok(c) => c,
-            Err(e) => {
-                let _ = stdout()
-                    .write_all(format!("Failed to get Postgres container port: {}\n", e).as_bytes())
-                    .await;
-                panic!("Failed to get Postgres container port: {}", e);
-            }
-        };
-
-        let database_url =
-            format!("postgres://myuser:mypassword@127.0.0.1:{pg_port}/mydb?sslmode=disable");
-
-        let pool = PgPoolOptions::new()
-            .max_connections(5)
-            .connect(&database_url)
-            .await
-            .expect("connect test postgres");
-
-        sqlx::migrate!("./migrations")
-            .run(&pool)
-            .await
-            .expect("run migrations");
+    sqlx::migrate!("./migrations")
+        .run(&pool)
+        .await
+        .expect("run migrations");
 
     let (stock_tx, _) = broadcast::channel(1024);
     let repo = Arc::new(InventoryRepo::new(pool.clone()));
@@ -101,7 +98,6 @@ macro_rules! require_db {
     };
 }
 
-
 pub fn new_variant_id() -> i32 {
     // 1..=2_000_000_000
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -116,7 +112,7 @@ pub fn new_variant_id() -> i32 {
     ((secs.wrapping_mul(1_000_000) ^ nanos) % 2_000_000_000 + 1) as i32
 }
 
-pub async fn seed_inventory(pool: &PgPool, variant_id: i32, stock: i32) {
+pub async fn seed_inventory(pool: &PgPool, variant_id: Uuid, stock: i32) {
     sqlx::query(
         r#"INSERT INTO inventory (variant_id, stock_quantity, reserved_quantity)
            VALUES ($1, $2, 0)
@@ -130,7 +126,7 @@ pub async fn seed_inventory(pool: &PgPool, variant_id: i32, stock: i32) {
     .expect("seed inventory");
 }
 
-pub async fn cleanup_variant(pool: &PgPool, variant_id: i32) {
+pub async fn cleanup_variant(pool: &PgPool, variant_id: Uuid) {
     let _ = sqlx::query("DELETE FROM reservations WHERE variant_id = $1")
         .bind(variant_id)
         .execute(pool)

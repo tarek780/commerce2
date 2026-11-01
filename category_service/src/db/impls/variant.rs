@@ -22,11 +22,10 @@ pub struct VariantRepo;
 
 impl VariantRepo {
     pub async fn list_by_product(pool: &PgPool, product_id: Uuid) -> AppResult<Vec<VariantRow>> {
-        Ok(sqlx::query_as!(
-            VariantRow,
+        Ok(sqlx::query_as::<_, VariantRow>(
             "SELECT * FROM product_variants WHERE product_id = $1 ORDER BY id",
-            product_id
         )
+        .bind(product_id)
         .fetch_all(pool)
         .await?)
     }

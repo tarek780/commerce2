@@ -1,13 +1,14 @@
 mod common;
 
 use inventory_service::inventory::expiry::expire_batch;
+use uuid::Uuid;
 
 #[tokio::test]
 async fn expiry_worker_releases_and_emits_event() {
     let env = require_db!();
-    let vid = common::new_variant_id();
-    common::seed_inventory(&env.pool, vid, 5).await;
+    let vid = Uuid::now_v7();
 
+    common::seed_inventory(&env.pool, vid, 5).await;
 
     let res = env
         .repo
@@ -15,17 +16,14 @@ async fn expiry_worker_releases_and_emits_event() {
         .await
         .unwrap();
 
-
     let mut rx = env.stock_tx.subscribe();
 
     let n = expire_batch(&env.pool, &env.stock_tx).await.unwrap();
     assert!(n >= 1, "expected at least one reservation expired");
 
-
     let (stock, reserved) = env.repo.get_stock(vid).await.unwrap();
     assert_eq!(stock, 5);
     assert_eq!(reserved, 0);
-
 
     let status: (String,) = sqlx::query_as("SELECT status FROM reservations WHERE id = $1")
         .bind(res.id)
@@ -34,11 +32,10 @@ async fn expiry_worker_releases_and_emits_event() {
         .unwrap();
     assert_eq!(status.0, "released");
 
-
     let mut got = false;
     for _ in 0..16 {
         match tokio::time::timeout(std::time::Duration::from_millis(200), rx.recv()).await {
-            Ok(Ok(ev)) if ev.event_type == "expired" && ev.variant_id == vid => {
+            Ok(Ok(ev)) if ev.event_type == "expired" && ev.variant_id == vid.to_string() => {
                 got = true;
                 break;
             }

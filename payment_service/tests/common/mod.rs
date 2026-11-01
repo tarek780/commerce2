@@ -1,145 +1,165 @@
-
 #![allow(dead_code)]
-
-use std::sync::Arc;
 
 use payment_service::config::PaymentConfig;
 use payment_service::gateway;
 use payment_service::state::AppState;
+use sqlx::{PgPool, postgres::PgPoolOptions};
+use std::sync::Arc;
 
 use testcontainers::{
-    ContainerAsync,
-    core::{Image, ImageExt, IntoContainerPort, WaitFor},
+    GenericImage,
+    core::{ImageExt, WaitFor},
     runners::AsyncRunner,
 };
-use testcontainers::{ContainerRequest, GenericImage};
-use tokio::io::AsyncWriteExt;
-use tokio::io::stdout;
- 
 
-pub fn test_config() -> PaymentConfig {
+pub fn test_config(db_url: String, kafka_broker: String) -> PaymentConfig {
     PaymentConfig {
-        database_url: std::env::var("TEST_DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5433/payment_test".into()),
-        grpc_addr: "127.0.0.1:0".into(),
-        http_addr: "127.0.0.1:0".into(),
+        database_url: db_url,
+        grpc_addr: "127.0.0.1:6001".into(),
+        http_addr: "127.0.0.1:6000".into(),
         gateway: "mock".into(),
         gateway_public_base: "http://localhost/pay".into(),
         webhook_secret: "test-secret".into(),
         reservation_ttl_secs: 900,
         expiry_scan_secs: 10,
-        kafka_brokers: "localhost:9092".into(),
+        kafka_brokers: kafka_broker,
         kafka_payment_topic: "payment.events.test".into(),
     }
 }
 
-/// Builds AppState + runs migrations against TEST_DATABASE_URL.
-/// Also truncates tables so each test starts clean.
 pub async fn test_state() -> Arc<AppState> {
+    unsafe {
+        std::env::set_var("SECRET_KEY", "test-secret-key-32-chars-minimum-xx");
+        std::env::set_var("RUST_LOG", "info");
+        std::env::set_var("RUST_BACKTRACE", "1");
+    }
 
-        unsafe {
-            std::env::set_var("SECRET_KEY", "test-secret-key-32-chars-minimum-xx");
-            std::env::set_var("RUST_LOG", "info");
-            std::env::set_var("RUST_BACKTRACE", "1");
-        }
+    let pg_image = GenericImage::new("postgres", "16.15-alpine3.24")
+        .with_wait_for(WaitFor::message_on_stdout(
+            "database system is ready to accept connections",
+        ))
+        .with_env_var("POSTGRES_USER", "myuser")
+        .with_env_var("POSTGRES_PASSWORD", "mypassword")
+        .with_env_var("POSTGRES_DB", "mydb");
 
-        let pg_image = GenericImage::new("postgres", "16.15-alpine3.24")
-            .with_wait_for(WaitFor::message_on_stdout(
-                "database system is ready to accept connections",
-            ))
-            .with_env_var("POSTGRES_USER", "myuser")
-            .with_env_var("POSTGRES_PASSWORD", "mypassword")
-            .with_env_var("POSTGRES_DB", "mydb");
+    let pg_container = pg_image
+        .start()
+        .await
+        .expect("Failed to start Postgres container");
 
-        let pg_container = pg_image
-            .start()
-            .await
-            .expect("Failed to start Postgres container");
+    let pg_port = pg_container
+        .get_host_port_ipv4(5432)
+        .await
+        .expect("Failed to get Postgres container port");
 
-        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    let database_url =
+        format!("postgres://myuser:mypassword@127.0.0.1:{pg_port}/mydb?sslmode=disable");
 
-        let pg_port = match pg_container.get_host_port_ipv4(5432).await {
-            Ok(c) => c,
-            Err(e) => {
-                let _ = stdout()
-                    .write_all(format!("Failed to get Postgres container port: {}\n", e).as_bytes())
-                    .await;
-                panic!("Failed to get Postgres container port: {}", e);
-            }
-        };
+    let kafka_image = GenericImage::new("apache/kafka", "latest")
+        .with_wait_for(WaitFor::message_on_stdout("Kafka Server started"))
+        .with_env_var("KAFKA_NODE_ID", "1")
+        .with_env_var("KAFKA_PROCESS_ROLES", "broker,controller")
+        .with_env_var(
+            "KAFKA_LISTENERS",
+            "PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093",
+        )
+        .with_env_var("KAFKA_ADVERTISED_LISTENERS", "PLAINTEXT://127.0.0.1:9092")
+        .with_env_var("KAFKA_CONTROLLER_LISTENER_NAMES", "CONTROLLER")
+        .with_env_var(
+            "KAFKA_LISTENER_SECURITY_PROTOCOL_MAP",
+            "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT",
+        )
+        .with_env_var("KAFKA_CONTROLLER_QUORUM_VOTERS", "1@127.0.0.1:9093")
+        .with_env_var("KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR", "1");
 
-        let database_url =
-            format!("postgres://myuser:mypassword@127.0.0.1:{pg_port}/mydb?sslmode=disable");
+    let kafka_container = kafka_image
+        .start()
+        .await
+        .expect("Failed to start Kafka container");
 
-        let pool = PgPoolOptions::new()
-            .max_connections(5)
-            .connect(&database_url)
-            .await
-            .expect("connect test postgres");
+    let kafka_port = kafka_container
+        .get_host_port_ipv4(9092)
+        .await
+        .expect("Failed to get Kafka container port");
 
+    let kafka_broker = format!("127.0.0.1:{kafka_port}");
 
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&database_url)
+        .await
+        .expect("connect test postgres");
 
     sqlx::migrate!("./migrations")
         .run(&pool)
         .await
         .expect("migrations failed");
 
-    // Clean slate
     sqlx::query("TRUNCATE payments, payment_attempts, outbox_events, processed_webhooks RESTART IDENTITY CASCADE")
         .execute(&pool)
         .await
         .expect("truncate failed");
 
-    let _ = gateway::build(&cfg); // ensure gateway builds
-    state
+    let cfg = test_config(database_url, kafka_broker.clone());
+
+    let _gateway_client = gateway::build(&cfg);
+
+    //
+    let kafka_topic =
+        std::env::var("KAFKA_PAYMENT_TOPIC").unwrap_or_else(|_| "payment.events".to_string());
+    let kafka = match payment_service::payment::kafka_publisher::KafkaPublisher::new(
+        kafka_broker.as_str(),
+        kafka_topic.as_str(),
+    ) {
+        Ok(k) => {
+            tracing::info!("kafka publisher ready");
+            Some(Arc::new(k))
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "kafka publisher unavailable; using outbox only");
+            None
+        }
+    };
+    Arc::new(AppState {
+        gateway: _gateway_client,
+        kafka: kafka,
+        db: pool,
+        config: Arc::new(cfg),
+    })
 }
 
-pub async fn pool(){
+pub async fn setup_pool() -> PgPool {
+    let pg_image = GenericImage::new("postgres", "16.15-alpine3.24")
+        .with_wait_for(WaitFor::message_on_stdout(
+            "database system is ready to accept connections",
+        ))
+        .with_env_var("POSTGRES_USER", "myuser")
+        .with_env_var("POSTGRES_PASSWORD", "mypassword")
+        .with_env_var("POSTGRES_DB", "mydb");
 
-        unsafe {
-            std::env::set_var("SECRET_KEY", "test-secret-key-32-chars-minimum-xx");
-            std::env::set_var("RUST_LOG", "info");
-            std::env::set_var("RUST_BACKTRACE", "1");
-        }
+    let pg_container = pg_image
+        .start()
+        .await
+        .expect("Failed to start Postgres container");
 
-        let pg_image = GenericImage::new("postgres", "16.15-alpine3.24")
-            .with_wait_for(WaitFor::message_on_stdout(
-                "database system is ready to accept connections",
-            ))
-            .with_env_var("POSTGRES_USER", "myuser")
-            .with_env_var("POSTGRES_PASSWORD", "mypassword")
-            .with_env_var("POSTGRES_DB", "mydb");
+    let pg_port = pg_container
+        .get_host_port_ipv4(5432)
+        .await
+        .expect("Failed to get Postgres container port");
 
-        let pg_container = pg_image
-            .start()
-            .await
-            .expect("Failed to start Postgres container");
+    let database_url =
+        format!("postgres://myuser:mypassword@127.0.0.1:{pg_port}/mydb?sslmode=disable");
 
-        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&database_url)
+        .await
+        .expect("connect test postgres");
 
-        let pg_port = match pg_container.get_host_port_ipv4(5432).await {
-            Ok(c) => c,
-            Err(e) => {
-                let _ = stdout()
-                    .write_all(format!("Failed to get Postgres container port: {}\n", e).as_bytes())
-                    .await;
-                panic!("Failed to get Postgres container port: {}", e);
-            }
-        };
+    sqlx::migrate!("./migrations")
+        .run(&pool)
+        .await
+        .expect("run migrations");
 
-        let database_url =
-            format!("postgres://myuser:mypassword@127.0.0.1:{pg_port}/mydb?sslmode=disable");
-
-        let pool = PgPoolOptions::new()
-            .max_connections(5)
-            .connect(&database_url)
-            .await
-            .expect("connect test postgres");
-
-        sqlx::migrate!("./migrations")
-            .run(&pool)
-            .await
-            .expect("run migrations");
-
-       pool
+    pool
 }

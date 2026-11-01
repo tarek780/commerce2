@@ -19,7 +19,7 @@ pub trait OrderClient: Send + Sync + 'static {
         &self,
         customer_id: &str,
         currency: &str,
-        items: Vec<(i64, i32, String)>,
+        items: Vec<(&str, i32, String)>,
         idempotency_key: &str,
     ) -> AppResult<OrderResponse>;
 
@@ -48,7 +48,7 @@ impl GrpcOrderClient {
     }
 }
 
-#[async_trait]
+#[tonic::async_trait]
 impl OrderClient for GrpcOrderClient {
     async fn create_order(
         &self,
@@ -58,13 +58,14 @@ impl OrderClient for GrpcOrderClient {
         idempotency_key: &str,
     ) -> AppResult<OrderResponse> {
         let mut c = self.inner.clone();
+
         let req = CreateOrderRequest {
             customer_id: customer_id.into(),
             currency: currency.into(),
             items: items
                 .into_iter()
                 .map(|(vid, qty, price)| PbOrderItem {
-                    variant_id: Uuid::parse_str(vid)?,
+                    variant_id: vid.into(),
                     quantity: qty,
                     unit_price: price,
                 })

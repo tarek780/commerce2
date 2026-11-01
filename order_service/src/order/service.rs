@@ -46,11 +46,12 @@ impl OrderService for OrderSvc {
         let items = r
             .items
             .into_iter()
-            .map(|i| {
+            .map(|i: OrderItem| {
                 let price = BigDecimal::from_str(&i.unit_price)
                     .map_err(|_| Status::invalid_argument("bad unit_price"))?;
                 Ok(orchestrator::NewItem {
-                    variant_id: i.variant_id,
+                    variant_id: Uuid::from_str(&i.variant_id.as_str())
+                        .map_err(|_| Status::invalid_argument("bad variant_id"))?,
                     quantity: i.quantity,
                     unit_price: price,
                 })

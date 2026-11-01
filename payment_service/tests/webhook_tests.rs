@@ -1,9 +1,9 @@
-
 mod common;
 
 use axum::body::Bytes;
 use axum::extract::{Path, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
+use axum::response::IntoResponse;
 use chrono::{Duration, Utc};
 use hmac::{Hmac, Mac};
 use payment_service::payment::repo::{PaymentRepo, PaymentRow};
@@ -57,9 +57,7 @@ async fn webhook_rejects_bad_signature() {
     let st = common::test_state().await;
     let id = seed_payment(&st, "wh-bad").await;
 
-    let body = Bytes::from_static(
-        br#"{"event_id":"e1","event_type":"payment.succeeded"}"#,
-    );
+    let body = Bytes::from_static(br#"{"event_id":"e1","event_type":"payment.succeeded"}"#);
 
     let resp = webhook::handle(
         State(st.clone()),
@@ -106,7 +104,6 @@ async fn webhook_is_idempotent_on_duplicate_event_id() {
     let raw = br#"{"event_id":"evt-dup","event_type":"payment.succeeded"}"#;
     let sig = sign(&st.config.webhook_secret, raw);
 
-
     let r1 = webhook::handle(
         State(st.clone()),
         Path(id.clone()),
@@ -116,7 +113,6 @@ async fn webhook_is_idempotent_on_duplicate_event_id() {
     .await
     .into_response();
     assert_eq!(r1.status(), StatusCode::OK);
-
 
     let r2 = webhook::handle(
         State(st.clone()),

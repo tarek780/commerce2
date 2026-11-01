@@ -1,16 +1,20 @@
+use base64::{Engine as _, engine::general_purpose};
 use category_service::error::AppError;
-use category_service::helpers::cursor::{decode_required, Cursor};
-use base64::{engine::general_purpose, Engine as _};
+use category_service::helpers::cursor::{Cursor, decode_required};
+use uuid::Uuid;
 
 #[test]
 fn roundtrip() {
-    let c = Cursor { id: 42 };
-    assert_eq!(Cursor::decode(&c.encode()).unwrap().id, 42);
+    let id = Uuid::now_v7();
+
+    let c = Cursor { id };
+    assert_eq!(Cursor::decode(&c.encode()).unwrap().id, id);
 }
 
 #[test]
 fn url_safe_alphabet() {
-    let s = Cursor { id: i64::MAX }.encode();
+    let id = Uuid::now_v7();
+    let s = Cursor { id }.encode();
     assert!(!s.contains('+') && !s.contains('/') && !s.contains('='));
 }
 
@@ -30,6 +34,7 @@ fn decode_required_error_variant() {
 
 #[test]
 fn decode_required_ok() {
-    let ok = decode_required(&Cursor { id: 7 }.encode()).unwrap();
-    assert_eq!(ok.id, 7);
+    let id = Uuid::now_v7();
+    let ok = decode_required(&Cursor { id }.encode()).unwrap();
+    assert_eq!(ok.id, id);
 }

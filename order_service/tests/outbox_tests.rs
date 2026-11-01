@@ -26,15 +26,15 @@ fn make_order(key: &str) -> OrderRow {
 
 #[tokio::test]
 async fn publish_batch_marks_events_published() {
-    let pool = common::setup_pool().await;
-    common::cleanup(&pool).await;
+    let state = common::setup_pool().await;
+    common::cleanup(&state.0.clone()).await;
+    let state = common::setup_state(state.0, state.1, state.2).await;
 
     let row = make_order("outbox-1");
-    OrderRepo::insert(&pool, &row, &[]).await.unwrap();
+    OrderRepo::insert(&state.db, &row, &[]).await.unwrap();
 
-    // ينشئ حدث
     OrderRepo::transition(
-        &pool,
+        &state.db,
         &row.id,
         &["pending"],
         "reserved",
@@ -49,35 +49,35 @@ async fn publish_batch_marks_events_published() {
 
     let pending: (i64,) =
         sqlx::query_as("SELECT count(*) FROM outbox_events WHERE published_at IS NULL")
-            .fetch_one(&pool)
+            .fetch_one(&state.db)
             .await
             .unwrap();
     assert_eq!(pending.0, 1);
 
-    let n = publisher::publish_batch(&pool).await.unwrap();
+    let n = publisher::publish_batch(&state.db).await.unwrap();
     assert_eq!(n, 1);
 
     let left: (i64,) =
         sqlx::query_as("SELECT count(*) FROM outbox_events WHERE published_at IS NULL")
-            .fetch_one(&pool)
+            .fetch_one(&state.db)
             .await
             .unwrap();
     assert_eq!(left.0, 0);
 
-    // استدعاء ثانٍ لا يجد شيئاً
-    let n2 = publisher::publish_batch(&pool).await.unwrap();
+    let n2 = publisher::publish_batch(&state.db).await.unwrap();
     assert_eq!(n2, 0);
 
-    common::cleanup(&pool).await;
+    common::cleanup(&state.db).await;
 }
 
 #[tokio::test]
 async fn publish_batch_empty_returns_zero() {
-    let pool = common::setup_pool().await;
-    common::cleanup(&pool).await;
+    let state = common::setup_pool().await;
+    common::cleanup(&state.0.clone()).await;
+    let state = common::setup_state(state.0, state.1, state.2).await;
 
-    let n = publisher::publish_batch(&pool).await.unwrap();
+    let n = publisher::publish_batch(&state.db).await.unwrap();
     assert_eq!(n, 0);
 
-    common::cleanup(&pool).await;
+    common::cleanup(&state.db).await;
 }

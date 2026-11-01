@@ -1,4 +1,3 @@
-
 mod common;
 
 use payment_service::config::PaymentConfig;
@@ -19,7 +18,9 @@ async fn config_from_env_reads_all_fields() {
         ("WEBHOOK_SECRET", "sec"),
     ];
     for (k, v) in envs {
-        std::env::set_var(k, v);
+        unsafe {
+            std::env::set_var(k, v);
+        }
     }
 
     let cfg = PaymentConfig::from_env().await.expect("from_env failed");
@@ -35,7 +36,9 @@ async fn config_from_env_reads_all_fields() {
 #[tokio::test]
 #[serial_test::serial]
 async fn config_from_env_fails_when_missing() {
-    std::env::remove_var("DATABASE_URL");
+    unsafe {
+        std::env::remove_var("DATABASE_URL");
+    }
 
     let res = PaymentConfig::from_env().await;
     assert!(res.is_err(), "should fail when DATABASE_URL missing");

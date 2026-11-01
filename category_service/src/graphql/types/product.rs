@@ -6,7 +6,7 @@ use crate::graphql::types::variant::Variant;
 use async_graphql::{ComplexObject, Context, Result as GqlResult, SimpleObject};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
-#[derive(SimpleObject)]
+#[derive(Default, SimpleObject)]
 #[graphql(complex)]
 pub struct Product {
     pub id: Uuid,

@@ -1,4 +1,4 @@
-use crate::db::impls::category::CategoryRepo;
+use crate::db::impls::category::{self, CategoryRepo, CategoryRow};
 use crate::db::impls::product::{ProductFilter, ProductRepo};
 use crate::graphql::context::GqlContext;
 use crate::graphql::pagination::{PageInfo, PageInput, ProductFilterInput};
@@ -7,7 +7,7 @@ use crate::graphql::types::connection::{ProductConnection, ProductEdge};
 use crate::graphql::types::product::Product;
 use crate::helpers::cursor::Cursor;
 use crate::redis::{json, search};
-use async_graphql::{Context, ID, Object, Result as GqlResult};
+use async_graphql::{Context, Object, Result as GqlResult};
 use uuid::Uuid;
 
 pub struct QueryRoot;
@@ -96,12 +96,12 @@ impl QueryRoot {
         })
     }
 
-    async fn category(&self, ctx: &Context<'_>, id: Uuid) -> GqlResult<Category> {
+    async fn category(&self, ctx: &Context<'_>, id: Uuid) -> GqlResult<Option<Category>> {
         let gql = ctx.data_unchecked::<GqlContext>().clone();
         let key = format!("category:{id}");
         if let Some(v) = json::get_json(&mut gql.state.redis.clone(), &key).await? {
             if let Ok(row) = serde_json::from_value::<crate::db::impls::category::CategoryRow>(v) {
-                return Ok(row.into());
+                return Ok(Some(row.into()));
             }
         }
         let row = CategoryRepo::get(&gql.state.db, id).await?;
@@ -111,15 +111,24 @@ impl QueryRoot {
             &serde_json::to_value(&row)?,
         )
         .await;
-        Ok(row.into())
+
+        let x = match row {
+            Some(r) => {
+                let category = Category::from(r);
+                category
+            }
+            None => Category::default(),
+        };
+
+        Ok(Some(x))
     }
 
-    async fn product(&self, ctx: &Context<'_>, id: Uuid) -> GqlResult<Product> {
+    async fn product(&self, ctx: &Context<'_>, id: Uuid) -> GqlResult<Option<Product>> {
         let gql = ctx.data_unchecked::<GqlContext>().clone();
         let key = format!("product:{id}");
         if let Some(v) = json::get_json(&mut gql.state.redis.clone(), &key).await? {
             if let Ok(row) = serde_json::from_value::<crate::db::impls::product::ProductRow>(v) {
-                return Ok(row.into());
+                return Ok(Some(row.into()));
             }
         }
         let row = ProductRepo::get(&gql.state.db, id).await?;
@@ -129,7 +138,16 @@ impl QueryRoot {
             &serde_json::to_value(&row)?,
         )
         .await;
-        Ok(row.into())
+
+        let x = match row {
+            Some(r) => {
+                let product = Product::from(r);
+                product
+            }
+            None => Product::default(),
+        };
+
+        Ok(Some(x))
     }
 
     async fn categories(

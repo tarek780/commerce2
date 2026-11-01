@@ -1,5 +1,6 @@
 use category_service::graphql::pagination::{PageInput, ProductFilterInput};
 use category_service::helpers::cursor::Cursor;
+use uuid::Uuid;
 
 #[test]
 fn default_limit_is_20() {
@@ -8,22 +9,57 @@ fn default_limit_is_20() {
 
 #[test]
 fn limit_is_clamped() {
-    assert_eq!(PageInput { first: Some(0), after: None }.limit(), 1);
-    assert_eq!(PageInput { first: Some(-5), after: None }.limit(), 1);
-    assert_eq!(PageInput { first: Some(1000), after: None }.limit(), 100);
-    assert_eq!(PageInput { first: Some(50), after: None }.limit(), 50);
+    assert_eq!(
+        PageInput {
+            first: Some(0),
+            after: None
+        }
+        .limit(),
+        1
+    );
+    assert_eq!(
+        PageInput {
+            first: Some(-5),
+            after: None
+        }
+        .limit(),
+        1
+    );
+    assert_eq!(
+        PageInput {
+            first: Some(1000),
+            after: None
+        }
+        .limit(),
+        100
+    );
+    assert_eq!(
+        PageInput {
+            first: Some(50),
+            after: None
+        }
+        .limit(),
+        50
+    );
 }
 
 #[test]
 fn cursor_from_after() {
-    let after = Cursor { id: 99 }.encode();
-    let p = PageInput { first: Some(10), after: Some(after) };
-    assert_eq!(p.cursor().unwrap().id, 99);
+    let id = Uuid::now_v7();
+    let after = Cursor { id }.encode();
+    let p = PageInput {
+        first: Some(10),
+        after: Some(after),
+    };
+    assert_eq!(p.cursor().unwrap().id, id);
 }
 
 #[test]
 fn invalid_after_yields_none() {
-    let p = PageInput { first: None, after: Some("bad".into()) };
+    let p = PageInput {
+        first: None,
+        after: Some("bad".into()),
+    };
     assert!(p.cursor().is_none());
 }
 

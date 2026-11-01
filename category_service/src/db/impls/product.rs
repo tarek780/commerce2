@@ -31,16 +31,22 @@ pub struct ProductFilter {
 pub struct ProductRepo;
 
 impl ProductRepo {
-    pub async fn get(pool: &PgPool, id: Uuid) -> AppResult<ProductRow> {
-        sqlx::query_as!(ProductRow, "SELECT * FROM products WHERE id = $1", id)
-            .fetch_optional(pool)
-            .await?
+    pub async fn get(pool: &PgPool, id: Uuid) -> AppResult<Option<ProductRow>> {
+        Ok(
+            sqlx::query_as::<_, ProductRow>("SELECT * FROM products WHERE id = $1")
+                .bind(id)
+                .fetch_optional(pool)
+                .await?,
+        )
     }
 
-    pub async fn get_by_slug(pool: &PgPool, slug: &str) -> AppResult<ProductRow> {
-        sqlx::query_as!(ProductRow, "SELECT * FROM products WHERE slug = $1", slug)
-            .fetch_optional(pool)
-            .await?
+    pub async fn get_by_slug(pool: &PgPool, slug: &str) -> AppResult<Option<ProductRow>> {
+        Ok(
+            sqlx::query_as::<_, ProductRow>("SELECT * FROM products WHERE slug = $1")
+                .bind(slug)
+                .fetch_optional(pool)
+                .await?,
+        )
     }
 
     /// filters + cursor pagination (id-based)

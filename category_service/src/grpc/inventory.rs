@@ -42,7 +42,7 @@ impl InventoryClient {
     pub async fn reserve(
         &self,
         key: &str,
-        variant_id: i32,
+        variant_id: String,
         quantity: i32,
         ttl: i64,
     ) -> AppResult<String> {

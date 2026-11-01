@@ -1,21 +1,24 @@
 // grpc
 mod common;
 
+use chrono::{Duration, Utc};
 use order_service::order::repo::{OrderRepo, OrderRow};
 use order_service::order::service::OrderSvc;
 use order_service::pb_order::order_service_server::OrderService;
-use order_service::pb_order::{CreateOrderRequest, GetOrderRequest, CancelOrderRequest};
-use chrono::{Duration, Utc};
+use order_service::pb_order::{CancelOrderRequest, CreateOrderRequest, GetOrderRequest};
 use sqlx::types::BigDecimal;
 use std::str::FromStr;
 use tonic::Request;
+use uuid::Uuid;
 
 #[tokio::test]
 async fn get_order_not_found_returns_status() {
-    let pool = common::setup_pool().await;
-    common::cleanup(&pool).await;
-    let state = common::setup_state(pool.clone()).await;
-    let svc = OrderSvc::new(state);
+    let state = common::setup_pool().await;
+    common::cleanup(&state.0.clone()).await;
+    let state = common::setup_state(state.0, state.1, state.2).await;
+
+    //
+    let svc = OrderSvc::new(state.clone());
 
     let err = svc
         .get_order(Request::new(GetOrderRequest {
@@ -25,14 +28,14 @@ async fn get_order_not_found_returns_status() {
         .unwrap_err();
     assert_eq!(err.code(), tonic::Code::NotFound);
 
-    common::cleanup(&pool).await;
+    common::cleanup(&state.db).await;
 }
 
 #[tokio::test]
 async fn get_order_returns_fields() {
-    let pool = common::setup_pool().await;
-    common::cleanup(&pool).await;
-    let state = common::setup_state(pool.clone()).await;
+    let state = common::setup_pool().await;
+    common::cleanup(&state.0.clone()).await;
+    let state = common::setup_state(state.0, state.1, state.2).await;
 
     let now = Utc::now();
     let row = OrderRow {
@@ -49,9 +52,9 @@ async fn get_order_returns_fields() {
         created_at: now,
         updated_at: now,
     };
-    OrderRepo::insert(&pool, &row, &[]).await.unwrap();
+    OrderRepo::insert(&state.db, &row, &[]).await.unwrap();
 
-    let svc = OrderSvc::new(state);
+    let svc = OrderSvc::new(state.clone());
     let resp = svc
         .get_order(Request::new(GetOrderRequest {
             order_id: row.id.clone(),
@@ -66,15 +69,15 @@ async fn get_order_returns_fields() {
     assert_eq!(resp.total_amount, "12.34");
     assert_eq!(resp.currency, "USD");
 
-    common::cleanup(&pool).await;
+    common::cleanup(&state.db).await;
 }
 
 #[tokio::test]
 async fn create_order_empty_items_invalid_argument() {
-    let pool = common::setup_pool().await;
-    common::cleanup(&pool).await;
-    let state = common::setup_state(pool.clone()).await;
-    let svc = OrderSvc::new(state);
+    let state = common::setup_pool().await;
+    common::cleanup(&state.0.clone()).await;
+    let state = common::setup_state(state.0, state.1, state.2).await;
+    let svc = OrderSvc::new(state.clone());
 
     let err = svc
         .create_order(Request::new(CreateOrderRequest {
@@ -87,15 +90,15 @@ async fn create_order_empty_items_invalid_argument() {
         .unwrap_err();
     assert_eq!(err.code(), tonic::Code::FailedPrecondition);
 
-    common::cleanup(&pool).await;
+    common::cleanup(&state.db).await;
 }
 
 #[tokio::test]
 async fn create_order_bad_price_invalid_argument() {
-    let pool = common::setup_pool().await;
-    common::cleanup(&pool).await;
-    let state = common::setup_state(pool.clone()).await;
-    let svc = OrderSvc::new(state);
+    let state = common::setup_pool().await;
+    common::cleanup(&state.0.clone()).await;
+    let state = common::setup_state(state.0, state.1, state.2).await;
+    let svc = OrderSvc::new(state.clone());
 
     use order_service::pb_order::OrderItem;
     let err = svc
@@ -103,7 +106,7 @@ async fn create_order_bad_price_invalid_argument() {
             customer_id: "c".into(),
             currency: "USD".into(),
             items: vec![OrderItem {
-                variant_id: 1,
+                variant_id: Uuid::now_v7().to_string(),
                 quantity: 1,
                 unit_price: "not-a-number".into(),
             }],
@@ -113,14 +116,14 @@ async fn create_order_bad_price_invalid_argument() {
         .unwrap_err();
     assert_eq!(err.code(), tonic::Code::InvalidArgument);
 
-    common::cleanup(&pool).await;
+    common::cleanup(&state.db).await;
 }
 
 #[tokio::test]
 async fn cancel_order_final_state_returns_failed_precondition() {
-    let pool = common::setup_pool().await;
-    common::cleanup(&pool).await;
-    let state = common::setup_state(pool.clone()).await;
+    let state = common::setup_pool().await;
+    common::cleanup(&state.0.clone()).await;
+    let state = common::setup_state(state.0, state.1, state.2).await;
 
     let now = Utc::now();
     let row = OrderRow {
@@ -137,9 +140,9 @@ async fn cancel_order_final_state_returns_failed_precondition() {
         created_at: now,
         updated_at: now,
     };
-    OrderRepo::insert(&pool, &row, &[]).await.unwrap();
+    OrderRepo::insert(&state.db, &row, &[]).await.unwrap();
 
-    let svc = OrderSvc::new(state);
+    let svc = OrderSvc::new(state.clone());
     let err = svc
         .cancel_order(Request::new(CancelOrderRequest {
             order_id: row.id.clone(),
@@ -149,14 +152,14 @@ async fn cancel_order_final_state_returns_failed_precondition() {
         .unwrap_err();
     assert_eq!(err.code(), tonic::Code::FailedPrecondition);
 
-    common::cleanup(&pool).await;
+    common::cleanup(&state.db).await;
 }
 
 #[tokio::test]
 async fn cancel_order_pending_success() {
-    let pool = common::setup_pool().await;
-    common::cleanup(&pool).await;
-    let state = common::setup_state(pool.clone()).await;
+    let state = common::setup_pool().await;
+    common::cleanup(&state.0.clone()).await;
+    let state = common::setup_state(state.0, state.1, state.2).await;
 
     let now = Utc::now();
     let row = OrderRow {
@@ -173,9 +176,9 @@ async fn cancel_order_pending_success() {
         created_at: now,
         updated_at: now,
     };
-    OrderRepo::insert(&pool, &row, &[]).await.unwrap();
+    OrderRepo::insert(&state.db, &row, &[]).await.unwrap();
 
-    let svc = OrderSvc::new(state);
+    let svc = OrderSvc::new(state.clone());
     let resp = svc
         .cancel_order(Request::new(CancelOrderRequest {
             order_id: row.id.clone(),
@@ -187,5 +190,5 @@ async fn cancel_order_pending_success() {
 
     assert_eq!(resp.status, "cancelled");
 
-    common::cleanup(&pool).await;
+    common::cleanup(&state.db).await;
 }

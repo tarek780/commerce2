@@ -1,6 +1,7 @@
 use axum::{
-    extract::{Path, Query, State ,Extension},
     Json,
+    extract::{Extension, Path, Query, State},
+    response::IntoResponse,
 };
 // Extension(auth): Extension<AccessToken>,
 use std::sync::Arc;
@@ -11,7 +12,8 @@ use crate::dto::order::{
     CancelOrderBody, OrderConnection, OrderDto, OrderEdge, PageInfoDto, PayOrderResponse,
 };
 use crate::dto::pagination::PageParams;
-use crate::error::AppError;
+use crate::error::{AppError, AppResult};
+use crate::middleware::auth::AccessToken;
 use crate::middleware::user::CurrentUser;
 use crate::state::AppState;
 
@@ -25,37 +27,40 @@ pub async fn get_order(
     if order.customer_id != auth.user_id {
         return Err(AppError::NotFound("order not found".into()));
     }
-    Ok(Json(to_order_dto(order)))
+    Ok(Json(to_dto(order)))
 }
 //
 /// GET /api/v1/orders
-pub async fn list(
-    State(state): State<Arc<AppState>>,
-    CurrentUser(user_id): CurrentUser,
-    Query(page): Query<PageParams>,
-) -> crate::error::AppResult<Json<OrderConnection>> {
-    let res = state
-        .order
-        .list_orders(&user_id.to_string(), page.limit(), &page.after_str(), "")
-        .await?;
 
-    let edges: Vec<OrderEdge> = res
-        .edges
-        .into_iter()
-        .map(|o| OrderEdge {
-            cursor: encode_cursor(&o.id),
-            node: to_dto(o),
-        })
-        .collect();
-
-    Ok(Json(OrderConnection {
-        edges,
-        page_info: PageInfoDto {
-            has_next_page: res.has_next_page,
-            end_cursor: if res.end_cursor.is_empty() { None } else { Some(res.end_cursor) },
-        },
-    }))
-}
+// pub async fn list(
+//     State(state): State<Arc<AppState>>,
+//     CurrentUser(user_id): CurrentUser,
+//     Query(page): Query<PageParams>,
+// ) -> crate::error::AppResult<Json<OrderConnection>> {
+//     let res = state
+//         .order
+//         .list_orders(&user_id.to_string(), page.limit(), &page.after_str(), "")
+//         .await?;
+//     let edges: Vec<OrderEdge> = res
+//         .edges
+//         .into_iter()
+//         .map(|o| OrderEdge {
+//             cursor: encode_cursor(&o.id),
+//             node: to_dto(o),
+//         })
+//         .collect();
+//     Ok(Json(OrderConnection {
+//         edges,
+//         page_info: PageInfoDto {
+//             has_next_page: res.has_next_page,
+//             end_cursor: if res.end_cursor.is_empty() {
+//                 None
+//             } else {
+//                 Some(res.end_cursor)
+//             },
+//         },
+//     }))
+// }
 
 /// GET /api/v1/orders/:id
 pub async fn get(
@@ -126,6 +131,6 @@ fn opt(s: String) -> Option<String> {
 }
 
 fn encode_cursor(s: &str) -> String {
-    use base64::{engine::general_purpose, Engine as _};
+    use base64::{Engine as _, engine::general_purpose};
     general_purpose::URL_SAFE_NO_PAD.encode(s.as_bytes())
 }

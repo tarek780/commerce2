@@ -2,7 +2,7 @@ CREATE TABLE categories (
     id UUID PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     slug VARCHAR(255) UNIQUE NOT NULL,
-    parent_id BIGINT REFERENCES categories(id) ON DELETE
+    parent_id UUID REFERENCES categories(id) ON DELETE
     SET NULL,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -38,7 +38,7 @@ CREATE INDEX idx_variants_attributes ON product_variants USING gin(attributes);
 CREATE TABLE outbox_events (
     id UUID PRIMARY KEY,
     aggregate_type TEXT NOT NULL,
-    aggregate_id BIGINT NOT NULL,
+    aggregate_id UUID NOT NULL,
     event_type TEXT NOT NULL,
     payload JSONB NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

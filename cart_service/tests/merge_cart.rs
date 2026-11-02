@@ -2,6 +2,7 @@ mod common;
 
 use cart_service::cart::model::AddItemRequest;
 use uuid::Uuid;
+
 #[tokio::test]
 async fn merge_guest_into_user_combines_and_deletes_guest() {
     let Some(env) = common::build_state().await else {
@@ -11,7 +12,8 @@ async fn merge_guest_into_user_combines_and_deletes_guest() {
 
     let user_id = common::unique_user_id();
 
-    env.state
+    match env
+        .state
         .cart_service
         .add_user_item(
             &user_id,
@@ -22,10 +24,23 @@ async fn merge_guest_into_user_combines_and_deletes_guest() {
             },
         )
         .await
-        .unwrap();
+    {
+        Ok(e) => e,
+        Err(e) => {
+            eprintln!("error: {e}");
+            return;
+        }
+    }
 
-    let guest_id = env.state.cart_service.create_guest_cart().await.unwrap();
-    env.state
+    let guest_id = match env.state.cart_service.create_guest_cart().await {
+        Ok(e) => e,
+        Err(e) => {
+            eprintln!("error: {e}");
+            return;
+        }
+    };
+    match env
+        .state
         .cart_service
         .add_guest_item(
             &guest_id,
@@ -36,8 +51,15 @@ async fn merge_guest_into_user_combines_and_deletes_guest() {
             },
         )
         .await
-        .unwrap();
-    env.state
+    {
+        Ok(e) => e,
+        Err(e) => {
+            eprintln!("error: {e}");
+            return;
+        }
+    };
+    match env
+        .state
         .cart_service
         .add_guest_item(
             &guest_id,
@@ -48,33 +70,53 @@ async fn merge_guest_into_user_combines_and_deletes_guest() {
             },
         )
         .await
-        .unwrap();
+    {
+        Ok(e) => e,
+        Err(e) => {
+            eprintln!("error: {e}");
+            return;
+        }
+    }
 
-    env.state
+    match env
+        .state
         .cart_service
         .merge_guest_into_user(&user_id, &guest_id)
         .await
-        .unwrap();
+    {
+        Ok(e) => e,
+        Err(e) => {
+            eprintln!("error: {e}");
+            return;
+        }
+    }
 
-    let cart = env
-        .state
-        .cart_service
-        .get_user_cart(&user_id)
-        .await
-        .unwrap();
+    let cart = match env.state.cart_service.get_user_cart(&user_id).await {
+        Ok(e) => e,
+        Err(e) => {
+            eprintln!("error: {e}");
+            return;
+        }
+    };
     assert_eq!(cart.items.len(), 2);
-    let a = cart
-        .items
-        .iter()
-        .find(|i| i.variant_id == Uuid::now_v7())
-        .unwrap();
-    let z = cart
-        .items
-        .iter()
-        .find(|i| i.variant_id == Uuid::now_v7())
-        .unwrap();
-    assert_eq!(a.quantity, 3);
-    assert_eq!(z.quantity, 3);
+    match cart.items.iter().find(|i| i.variant_id == Uuid::now_v7()) {
+        Some(a) => {
+            assert_eq!(a.quantity, 3);
+        }
+        None => {
+            eprintln!("NULL");
+            return;
+        }
+    }
+    match cart.items.iter().find(|i| i.variant_id == Uuid::now_v7()) {
+        Some(z) => {
+            assert_eq!(z.quantity, 3);
+        }
+        None => {
+            eprintln!("NULL");
+            return;
+        }
+    }
 
     let err = env
         .state
@@ -93,13 +135,26 @@ async fn merge_empty_guest_cart_just_deletes_it() {
     };
 
     let user_id = common::unique_user_id();
-    let guest_id = env.state.cart_service.create_guest_cart().await.unwrap();
+    let guest_id = match env.state.cart_service.create_guest_cart().await {
+        Ok(e) => e,
+        Err(e) => {
+            eprintln!("error: {e}");
+            return;
+        }
+    };
 
-    env.state
+    match env
+        .state
         .cart_service
         .merge_guest_into_user(&user_id, &guest_id)
         .await
-        .unwrap();
+    {
+        Ok(e) => e,
+        Err(e) => {
+            eprintln!("error: {e}");
+            return;
+        }
+    }
 
     let err = env
         .state

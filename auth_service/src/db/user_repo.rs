@@ -15,17 +15,20 @@ pub async fn create_user(
 ) -> Result<User, AppError> {
     let user = sqlx::query_as::<_, User>(
         r#"
-        INSERT INTO users (email, password_hash, display_name , full_name , username , u_role )
-        VALUES ($1, $2, $3 , $4 , $5 , $6)
+        INSERT INTO users (id , email, password_hash, display_name , full_name , username , u_role , created_at , updated_at)
+        VALUES ($1, $2, $3 , $4 , $5 , $6, $7, $8, $9)
         RETURNING *
         "#,
     )
+    .bind(Uuid::now_v7())
     .bind(email)
     .bind(password_hash)
     .bind(display_name)
     .bind(full_name)
     .bind(username)
     .bind(u_role)
+    .bind(Utc::now())
+    .bind(Utc::now())
     .fetch_one(pool)
     .await
     .map_err(map_unique_email)?;

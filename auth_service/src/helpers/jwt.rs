@@ -26,7 +26,7 @@ pub fn issue_token(
     let now = Utc::now();
     let secret = std::env::var("SECRET_KEY")?;
     let issuer = std::env::var("JWT_ISSUER")?;
-    let audience = std::env::var("JWT_AUDIENCE ")?;
+    let audience = std::env::var("JWT_AUDIENCE")?;
     let claims = Claims {
         sub: user_id.into(),
         iss: issuer.into(),
@@ -48,7 +48,7 @@ pub fn issue_token(
 pub fn verify_token(token: &str) -> Result<Claims, AppError> {
     let secret: String = std::env::var("SECRET_KEY")?;
     let issuer = std::env::var("JWT_ISSUER")?;
-    let audience = std::env::var("JWT_AUDIENCE ")?;
+    let audience = std::env::var("JWT_AUDIENCE")?;
     let mut v = Validation::new(Algorithm::HS256);
     v.set_issuer(&[issuer]);
     v.set_audience(&[audience]);

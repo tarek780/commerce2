@@ -16,6 +16,18 @@ pub struct ProductRow {
     pub updated_at: DateTime<Utc>,
 }
 
+// CREATE TABLE products (
+//     id UUID PRIMARY KEY,
+//     category_id UUID REFERENCES categories(id) ON DELETE RESTRICT,
+//     name VARCHAR(255) NOT NULL,
+//     slug VARCHAR(255) UNIQUE NOT NULL,
+//     description TEXT,
+//     brand VARCHAR(100),
+//     is_active BOOLEAN NOT NULL DEFAULT TRUE,
+//     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+//     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+// );
+
 #[derive(Debug, Clone, Default)]
 pub struct ProductFilter {
     pub category_id: Option<Uuid>,
@@ -25,8 +37,6 @@ pub struct ProductFilter {
     pub min_price: Option<f64>,
     pub max_price: Option<f64>,
 }
-
-/// error communicating with database: Connection refused (os error 111)
 
 pub struct ProductRepo;
 
@@ -98,9 +108,10 @@ impl ProductRepo {
         is_active: bool,
     ) -> AppResult<String> {
         let id = sqlx::query_scalar(
-            r#"INSERT INTO products (category_id, name, slug, description, brand, is_active)
-               VALUES ($1,$2,$3,$4,$5,$6) RETURNING id"#,
+            r#"INSERT INTO products (id , category_id, name, slug, description, brand, is_active)
+               VALUES ($1,$2,$3,$4,$5,$6 , $7) RETURNING id"#,
         )
+        .bind(Uuid::now_v7())
         .bind(category_id)
         .bind(name)
         .bind(slug)

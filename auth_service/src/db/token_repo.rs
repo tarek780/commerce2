@@ -14,6 +14,7 @@ pub struct RefreshTokenRow {
     pub rotated: bool,
     pub revoked: bool,
     pub expires_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
 }
 
 pub async fn insert_refresh_token(
@@ -28,14 +29,17 @@ pub async fn insert_refresh_token(
 
     sqlx::query(
         r#"
-        INSERT INTO refresh_tokens (user_id, token_hash, family_id, expires_at)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO refresh_tokens (id , user_id, token_hash, u_role, family_id, expires_at , created_at)
+        VALUES ($1, $2, $3, $4, $5 , $6, $7)
         "#,
     )
+    .bind(Uuid::now_v7())
     .bind(user_id)
     .bind(token_hash)
+    .bind("USER") // default role for refresh tokens
     .bind(family_id)
     .bind(expires_at)
+    .bind(chrono::Utc::now())
     .execute(pool)
     .await?;
 
@@ -82,6 +86,7 @@ pub async fn revoke_by_hash(pool: &PgPool, token_hash: &str) -> Result<(), AppEr
 }
 
 pub async fn delete(pool: &PgPool, user_id: &str) -> Result<(), AppError> {
+    let user_id = Uuid::parse_str(user_id)?;
     sqlx::query("DELETE FROM refresh_tokens WHERE user_id = $1")
         .bind(user_id)
         .execute(pool)

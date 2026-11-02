@@ -16,7 +16,10 @@ impl CartService {
     }
 
     pub async fn get_guest_cart(&self, guest_id: &str) -> Result<CachedCart, CartError> {
-        self.guest_repo.get(guest_id).await
+        match self.guest_repo.get(guest_id).await {
+            Ok(o) => Ok(o),
+            Err(_) => Err(CartError::NotFound),
+        }
     }
 
     pub async fn add_guest_item(

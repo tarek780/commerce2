@@ -1,20 +1,12 @@
 use redis::aio::ConnectionManager;
 
-use testcontainers::{
-    ContainerAsync,
-    core::{Image, ImageExt, IntoContainerPort, WaitFor},
-    runners::AsyncRunner,
-};
-use testcontainers::{ContainerRequest, GenericImage};
+use testcontainers::GenericImage;
+use testcontainers::{core::WaitFor, runners::AsyncRunner};
 use tokio::io::AsyncWriteExt;
 use tokio::io::stdout;
 
 pub async fn setup() -> ConnectionManager {
-    unsafe {
-        std::env::set_var("SECRET_KEY", "test-secret-key-32-chars-minimum-xx");
-        std::env::set_var("RUST_LOG", "info");
-        std::env::set_var("RUST_BACKTRACE", "1");
-    }
+    dotenvy::dotenv().ok();
 
     let redis_image = GenericImage::new("redis", "alpine3.23")
         .with_wait_for(WaitFor::message_on_stdout("Ready to accept connections"));

@@ -223,12 +223,13 @@ async fn handle_event(
         }
         CatalogEvent::CategoryUpdated { id, payload } => {
             let id = String::from(id);
+            let parent_id =payload["parent_id"].as_str();
             CategoryRepo::update(
                 &state.db,
                 id.as_str(),
                 payload["name"].as_str(),
                 payload["slug"].as_str(),
-                payload["parent_id"].as_i64().map(Some),
+                payload["parent_id"],
             )
             .await?;
             let id = Uuid::parse_str(id.as_str())?;

@@ -26,9 +26,6 @@ fn build_app_with_layer() -> Router {
 
 #[tokio::test]
 async fn rejects_missing_authorization() {
-    unsafe {
-        std::env::set_var("SECRET_KEY", "test-secret");
-    }
     let app = build_app_with_layer();
 
     let resp = app
@@ -45,9 +42,6 @@ async fn rejects_missing_authorization() {
 
 #[tokio::test]
 async fn rejects_malformed_header() {
-    unsafe {
-        std::env::set_var("SECRET_KEY", "test-secret");
-    }
     let app = build_app_with_layer();
 
     let resp = app
@@ -65,9 +59,8 @@ async fn rejects_malformed_header() {
 
 #[tokio::test]
 async fn accepts_valid_token_and_injects_user_id() {
-    unsafe {
-        std::env::set_var("SECRET_KEY", "test-secret");
-    }
+    dotenvy::dotenv().ok().expect("var err");
+
     let token =
         auth_service::helpers::jwt::issue_token("user-123".into(), "user", "access", 3600).unwrap();
 
@@ -91,9 +84,7 @@ async fn accepts_valid_token_and_injects_user_id() {
 
 #[tokio::test]
 async fn rejects_expired_token() {
-    unsafe {
-        std::env::set_var("SECRET_KEY", "test-secret");
-    }
+    dotenvy::dotenv().ok().expect("var err");
     let token =
         auth_service::helpers::jwt::issue_token("user-123".into(), "user", "access", -1).unwrap();
 

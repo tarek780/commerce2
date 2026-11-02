@@ -6,21 +6,19 @@ use tokio::io::stdout;
 use axum::Router;
 use tower_http::trace::TraceLayer;
 
+use cart_service::auth::layer::AuthLayer;
+use cart_service::cart::handlers;
 use cart_service::cart::repository::{GuestCartRepo, UserCartRepo};
 use cart_service::cart::service::CartService;
 use cart_service::state::AppState;
-
-use cart_service::auth::layer::AuthLayer;
-use cart_service::cart::handlers;
+use sqlx::PgPool;
 
 use sqlx::postgres::PgPoolOptions;
-use std::io::Stdout;
+use testcontainers::GenericImage;
 use testcontainers::{
-    ContainerAsync,
-    core::{Image, ImageExt, IntoContainerPort, WaitFor},
+    core::{ImageExt, WaitFor},
     runners::AsyncRunner,
 };
-use testcontainers::{ContainerRequest, GenericImage};
 use tokio::io::AsyncWriteExt;
 
 pub struct TestEnv {
@@ -29,12 +27,7 @@ pub struct TestEnv {
 
 pub async fn build_state() -> Option<TestEnv> {
     //
-    unsafe {
-        std::env::set_var("SECRET_KEY", "test-secret-key-32-chars-minimum-xx");
-        std::env::set_var("RUST_LOG", "info");
-        std::env::set_var("RUST_BACKTRACE", "1");
-    }
-
+    dotenvy::dotenv().ok();
     let pg_image = GenericImage::new("postgres", "16.15-alpine3.24")
         .with_wait_for(WaitFor::message_on_stdout(
             "database system is ready to accept connections",
@@ -63,11 +56,37 @@ pub async fn build_state() -> Option<TestEnv> {
     let database_url =
         format!("postgres://myuser:mypassword@127.0.0.1:{pg_port}/mydb?sslmode=disable");
 
-    let pool = PgPoolOptions::new()
-        .max_connections(5)
-        .connect(&database_url)
-        .await
-        .expect("connect test postgres");
+    let mut pool_option: Option<PgPool> = None;
+    let mut attempts = 0;
+    let max_attempts = 7;
+
+    while attempts < max_attempts {
+        match PgPoolOptions::new()
+            .max_connections(5)
+            .acquire_timeout(std::time::Duration::from_secs(2)) // مهلة قصيرة للمحاولة الواحدة لتفادي التعليق
+            .connect(&database_url)
+            .await
+        {
+            Ok(p) => {
+                pool_option = Some(p);
+                break;
+            }
+            Err(e) => {
+                attempts += 1;
+                let _ = stdout()
+                    .write_all(format!("⚠️ [محاولة {}/{}] قاعدة البيانات تعيد التشغيل حالياً، جاري إعادة المحاولة خلال 500ms... الخطأ: {}\n", attempts, max_attempts, e).as_bytes())
+                    .await;
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await; // انتظر نصف ثانية للنهوض النهائي للحاوية
+            }
+        }
+    }
+
+    let pool = pool_option.unwrap_or_else(|| {
+        panic!(
+            "failed to connect to database after {} attempts",
+            max_attempts
+        );
+    });
 
     sqlx::migrate!("./migrations")
         .run(&pool)
@@ -142,11 +161,11 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             axum::routing::post(handlers::create_guest_cart),
         )
         .route(
-            "/guest/cart/:guest_id",
+            "/guest/cart/{guest_id}",
             axum::routing::get(handlers::get_guest_cart),
         )
         .route(
-            "/guest/cart/:guest_id/items",
+            "/guest/cart/{guest_id}/items",
             axum::routing::post(handlers::add_guest_item),
         );
 

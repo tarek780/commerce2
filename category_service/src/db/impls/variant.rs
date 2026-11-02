@@ -44,8 +44,9 @@ impl VariantRepo {
         let id = sqlx::query_scalar(
             r#"INSERT INTO product_variants
                (product_id, sku, price, compare_at_price, image_url, attributes, is_active)
-               VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id"#,
+               VALUES ($1,$2,$3,$4,$5,$6,$7 , $8) RETURNING id"#,
         )
+        .bind(Uuid::now_v7())
         .bind(product_id)
         .bind(sku)
         .bind(price)

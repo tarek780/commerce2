@@ -1,7 +1,8 @@
 use axum::{
     Extension, Json,
     extract::{Path, State},
-    http::StatusCode,
+    http::{Response, StatusCode},
+    response::IntoResponse,
 };
 use std::sync::Arc;
 use uuid::Uuid;
@@ -15,24 +16,33 @@ use crate::state::AppState;
 #[tracing::instrument(skip(state))]
 pub async fn create_guest_cart(
     State(state): State<Arc<AppState>>,
-) -> Result<Json<GuestCartCreated>, CartError> {
+) -> Result<impl IntoResponse, CartError> {
     let guest_cart_id = state.cart_service.create_guest_cart().await?;
     tracing::info!(guest_cart_id, "guest cart created");
-    Ok(Json(GuestCartCreated {
-        guest_cart_id: Uuid::parse_str(&guest_cart_id.as_str())?,
-    }))
+
+    Ok((
+        StatusCode::OK,
+        Json(GuestCartCreated {
+            guest_cart_id: Uuid::parse_str(&guest_cart_id.as_str())?,
+        }),
+    )
+        .into_response())
 }
 
 #[tracing::instrument(skip(state))]
 pub async fn get_guest_cart(
     State(state): State<Arc<AppState>>,
     Path(guest_id): Path<String>,
-) -> Result<Json<CartResponse>, CartError> {
+) -> Result<impl IntoResponse, CartError> {
     let c = state.cart_service.get_guest_cart(&guest_id).await?;
-    Ok(Json(CartResponse {
-        items: c.items,
-        updated_at: c.updated_at,
-    }))
+    Ok((
+        StatusCode::OK,
+        Json(CartResponse {
+            items: c.items,
+            updated_at: c.updated_at,
+        }),
+    )
+        .into_response())
 }
 
 #[tracing::instrument(skip(state), fields(guest_id = %guest_id))]
@@ -40,13 +50,17 @@ pub async fn add_guest_item(
     State(state): State<Arc<AppState>>,
     Path(guest_id): Path<String>,
     Json(req): Json<AddItemRequest>,
-) -> Result<Json<CartResponse>, CartError> {
+) -> Result<impl IntoResponse, CartError> {
     state.cart_service.add_guest_item(&guest_id, req).await?;
     let c = state.cart_service.get_guest_cart(&guest_id).await?;
-    Ok(Json(CartResponse {
-        items: c.items,
-        updated_at: c.updated_at,
-    }))
+    Ok((
+        StatusCode::OK,
+        Json(CartResponse {
+            items: c.items,
+            updated_at: c.updated_at,
+        }),
+    )
+        .into_response())
 }
 
 #[tracing::instrument(skip(state), fields(guest_id = %guest_id))]

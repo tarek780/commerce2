@@ -57,11 +57,14 @@ impl CategoryRepo {
             pid = x
         }
         let id = sqlx::query_scalar::<_, Uuid>(
-            "INSERT INTO categories (name, slug, parent_id) VALUES ($1,$2,$3) RETURNING id",
+            "INSERT INTO categories (id ,name, slug, parent_id ,created_at , updated_at ) VALUES ($1,$2,$3 , $4 , $5 , $6) RETURNING id",
         )
+        .bind(Uuid::now_v7())
         .bind(name)
         .bind(slug)
         .bind(parent_id.map(|p| Uuid::parse_str(p)).transpose()?)
+        .bind(Utc::now())
+        .bind(Utc::now())
         .fetch_one(pool)
         .await
         .map_err(|e| match e {
@@ -78,7 +81,7 @@ impl CategoryRepo {
         id: &str,
         name: Option<&str>,
         slug: Option<&str>,
-        parent_id: Option<Option<i64>>,
+        parent_id: Option<Uuid>,
     ) -> AppResult<()> {
         let id = Uuid::parse_str(id)?;
         let res = sqlx::query(
@@ -92,7 +95,7 @@ impl CategoryRepo {
         .bind(id)
         .bind(name)
         .bind(slug)
-        .bind(parent_id.flatten())
+        .bind(parent_id)
         .execute(pool)
         .await?;
         if res.rows_affected() == 0 {

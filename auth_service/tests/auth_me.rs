@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 mod common;
 
 use axum::body::Body;
@@ -7,6 +8,7 @@ use tower::ServiceExt;
 
 use common::{ME, TestContext, body_json, get_req, patch_req, register_user, truncate_all};
 
+//
 #[tokio::test]
 async fn get_me_returns_current_user() {
     let ctx = TestContext::new().await;
@@ -62,6 +64,7 @@ async fn get_me_with_malformed_bearer_unauthorized() {
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
 }
 
+//
 #[tokio::test]
 async fn get_me_with_expired_access_token_unauthorized() {
     let ctx = TestContext::new().await;
@@ -109,6 +112,7 @@ async fn update_me_display_name() {
     assert_eq!(me["display_name"], "New Name");
 }
 
+//
 #[tokio::test]
 async fn update_me_empty_display_name_rejected() {
     let ctx = TestContext::new().await;
@@ -125,7 +129,7 @@ async fn update_me_empty_display_name_rejected() {
     assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
 }
 
-// #[allow(dead_code)]
+//
 // fn _unused(_: Request<Body>) {
 //     let _ = json_req;
 // }

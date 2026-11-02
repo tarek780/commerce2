@@ -36,6 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_thread_ids(true)
         .with_line_number(true)
         .init();
+    console_subscriber::init();
 
     tracing::info!("starting auth-service");
 

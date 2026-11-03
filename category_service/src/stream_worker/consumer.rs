@@ -10,6 +10,7 @@ use uuid::Uuid;
 use crate::db::impls::category::CategoryRepo;
 use crate::db::impls::product::ProductRepo;
 use crate::db::impls::variant::VariantRepo;
+use crate::error::AppError;
 use crate::redis::{json, stream::CatalogEvent};
 use crate::state::AppState;
 
@@ -223,13 +224,19 @@ async fn handle_event(
         }
         CatalogEvent::CategoryUpdated { id, payload } => {
             let id = String::from(id);
-            let parent_id =payload["parent_id"].as_str();
+            let mut pid = Uuid::now_v7();
+            if let Some(parent_id) = payload["parent_id"].as_str() {
+                let uuid = Uuid::parse_str(parent_id).unwrap_or_default();
+
+                pid = uuid
+            }
+
             CategoryRepo::update(
                 &state.db,
                 id.as_str(),
                 payload["name"].as_str(),
                 payload["slug"].as_str(),
-                payload["parent_id"],
+                Some(pid),
             )
             .await?;
             let id = Uuid::parse_str(id.as_str())?;

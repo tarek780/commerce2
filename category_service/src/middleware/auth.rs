@@ -1,4 +1,3 @@
-
 use crate::error::AppError;
 use axum::{
     extract::Request,
@@ -7,69 +6,52 @@ use axum::{
     response::Response,
 };
 use futures_util::future::BoxFuture;
-use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
+use jsonwebtoken::{Algorithm, DecodingKey, Header, Validation, decode};
 use serde::{Deserialize, Serialize};
-use std::ops::Not;
 use tower::{Layer, Service};
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Copy)]
-pub(crate) enum Typ {
-    Access,
-    Refresh,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Claims {
+    pub sub: String,
+    pub iss: String,
+    pub aud: String,
+    pub exp: usize,
+    pub iat: usize,
+    pub jti: String,
+    pub typ: String,
+    pub role: String,
 }
 
-impl Not for Typ {
-    type Output = Self;
-    fn not(self) -> Self::Output {
-        match self {
-            Self::Access => Self::Refresh,
-            Self::Refresh => Self::Access,
-        }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Copy)]
-pub(crate) enum Role {
-    Admin,
-    User,
-}
-
-
-impl Not for Role {
-    type Output = Self;
-    fn not(self) -> Self::Output {
-        match self {
-            Self::Admin => Self::User,
-            Self::User => Self::Admin,
-        }
-    }
-}
-
-// Decode
-#[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct DecodedToken {
-    pub(crate) typ: Typ,
-    pub(crate) user_id: String,
-    pub(crate) token_id: String,
-    pub(crate) role: Role,
-    pub(crate) exp: i64,
-}
-
-impl DecodedToken {
-    pub(crate) fn decode_jwt(token: &str) -> Result<Self, AppError> {
+impl Claims {
+    pub fn decode_jwt(token: &str) -> Result<Self, AppError> {
         let secret = std::env::var("SECRET_KEY")?;
-        let validation = Validation::new(Algorithm::HS256);
+
+        let mut validation = Validation::new(Algorithm::HS256);
+
+        validation.leeway = 0;
+
+        validation.validate_aud = false;
+        validation.set_required_spec_claims(&["exp", "sub"]);
+
         let decoded = decode::<Self>(
             token,
-            &DecodingKey::from_secret(&secret.into_bytes()),
+            &DecodingKey::from_secret(secret.as_bytes()),
             &validation,
-        )?;
+        )
+        .map_err(|e| AppError::Internal(format!("jwt decode error: {e}")))?;
+
         Ok(decoded.claims)
     }
 }
 
 #[derive(Clone)]
-pub(crate) struct AuthLayer {}
+pub struct AuthLayer {}
+
+impl AuthLayer {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
 
 impl<S> Layer<S> for AuthLayer {
     type Service = AuthService<S>;
@@ -79,7 +61,7 @@ impl<S> Layer<S> for AuthLayer {
 }
 
 #[derive(Clone)]
-pub(crate) struct AuthService<S> {
+pub struct AuthService<S> {
     inner: S,
 }
 
@@ -117,11 +99,12 @@ where
         };
 
         Box::pin(async move {
-            match DecodedToken::decode_jwt(&token) {
-                Ok(token_data) => {
+
+            match Claims::decode_jwt(&token) {
+                Ok(claims) => {
+
                     let data = AccessToken {
-                        user_id: token_data.user_id,
-                        role: token_data.role,
+                        user_id: claims.sub,
                     };
                     req.extensions_mut().insert(data);
 
@@ -134,7 +117,6 @@ where
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct AccessToken {
-    pub(crate) user_id: String,
-    pub(crate) role: Role,
+pub struct AccessToken {
+    pub user_id: String,
 }

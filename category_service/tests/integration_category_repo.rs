@@ -6,12 +6,19 @@ use uuid::Uuid;
 
 #[tokio::test]
 async fn crud_flow() {
-    let pool = common::db::setup().await;
+    let state = common::db::build_state().await;
+    let pool = state.0;
 
-    let id = CategoryRepo::insert(&pool, "Electronics", "electronics", None)
-        .await
-        .unwrap();
+    let id = match CategoryRepo::insert(&pool, "Electronics", "electronics", None).await {
+        Ok(o) => o,
+        Err(e) => {
+            panic!(" err : {e}");
+            return;
+        }
+    };
+
     let row = CategoryRepo::get(&pool, id).await.unwrap();
+
     if let Some(row) = row {
         assert_eq!(row.name, "Electronics");
         assert_eq!(row.slug, "electronics");

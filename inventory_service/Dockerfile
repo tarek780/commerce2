@@ -19,7 +19,7 @@ COPY src ./src
 
 
 RUN touch src/main.rs 
-RUN cargo test --test-threads=1 --release
+RUN cargo test  --release
 RUN cargo build --release
 
 

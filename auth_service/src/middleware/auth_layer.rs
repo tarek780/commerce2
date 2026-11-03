@@ -99,10 +99,10 @@ where
         };
 
         Box::pin(async move {
-            // نستخدم دالة الـ decode المحدثة المبنية على Claims
+
             match Claims::decode_jwt(&token) {
                 Ok(claims) => {
-                    // الـ sub يمثل الـ user_id في الـ Claims المعيارية
+
                     let data = AccessToken {
                         user_id: claims.sub,
                     };

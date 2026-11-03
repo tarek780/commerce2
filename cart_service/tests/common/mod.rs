@@ -63,7 +63,7 @@ pub async fn build_state() -> Option<TestEnv> {
     while attempts < max_attempts {
         match PgPoolOptions::new()
             .max_connections(5)
-            .acquire_timeout(std::time::Duration::from_secs(2)) // مهلة قصيرة للمحاولة الواحدة لتفادي التعليق
+            .acquire_timeout(std::time::Duration::from_secs(2)) 
             .connect(&database_url)
             .await
         {
@@ -74,9 +74,10 @@ pub async fn build_state() -> Option<TestEnv> {
             Err(e) => {
                 attempts += 1;
                 let _ = stdout()
-                    .write_all(format!("⚠️ [محاولة {}/{}] قاعدة البيانات تعيد التشغيل حالياً، جاري إعادة المحاولة خلال 500ms... الخطأ: {}\n", attempts, max_attempts, e).as_bytes())
+                    .write_all(format!("⚠️ [step : {}/{}] {}\n", attempts, max_attempts, e).as_bytes())
                     .await;
-                tokio::time::sleep(std::time::Duration::from_millis(500)).await; // انتظر نصف ثانية للنهوض النهائي للحاوية
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
             }
         }
     }

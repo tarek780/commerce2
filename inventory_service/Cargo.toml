@@ -3,10 +3,6 @@ name = "inventory_service"
 version = "0.1.0"
 edition = "2024"
 
-[lib]
-name = "inventory_service"
-path = "src/lib.rs"
-
 [dependencies]
 
 tonic = "0.12"

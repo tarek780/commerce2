@@ -141,6 +141,31 @@ services:
     environment:
       - BIND_ADDRESS=0.0.0.0:8000
       - DATABASE_URL=postgres://myuser:mypassword@postgres:5432/mydb?sslmode=disable
+      
+      storefront-service:
+         build:
+           context: ./storefront-service
+           dockerfile: Dockerfile
+         ports:
+           - "9000:9000"
+          depends_on:
+            - category_service
+            - inventory_service
+            - payment_service
+            - cart_service
+            - order_service
+            - postgres
+            - redis
+          environment:
+            - HTTP_ADDR=0.0.0.0:9000
+            #---
+            - CART_BASE_URL=cart_service:5000
+            - CATEGORY_GRAPHQL_URL=category_service:4000
+            - ORDER_GRPC_URL=order_service:7000
+            - PAYMENT_GRPC_URL=payment_service:6001
+            - INVENTORY_GRPC_URL=inventory_service:8000
+            #---
+            - REDIS_URL=redis://:myredispassword@redis:6379
 
 volumes:
   pgdata:

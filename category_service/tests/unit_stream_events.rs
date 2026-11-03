@@ -47,10 +47,20 @@ fn kinds() {
 }
 
 #[test]
-// fn ids() {
-//     assert_eq!(CatalogEvent::CategoryCreated { id: 5, payload: json!({}) }.id(), 5);
-//     assert_eq!(CatalogEvent::ProductDeleted { id: 9 }.id(), 9);
-// }
+fn ids() {
+    let id1 = Uuid::now_v7();
+    let id12 = Uuid::now_v7();
+    assert_eq!(
+        CatalogEvent::CategoryCreated {
+            id: id1,
+            payload: json!({})
+        }
+        .id(),
+        id1
+    );
+    assert_eq!(CatalogEvent::ProductDeleted { id: id12 }.id(), id12);
+}
+
 #[test]
 fn serde_tagged_roundtrip() {
     let id = Uuid::now_v7();

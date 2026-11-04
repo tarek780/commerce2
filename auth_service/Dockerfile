@@ -22,7 +22,7 @@ COPY src ./src
 
 RUN --mount=type=cache,id=auth_service-cargo-registry,target=/usr/local/cargo/registry \
 
-    --mount=type=cache,id=auth_service-cargo-target,target=/usr/src/app/target \
+    --mount=type=cache,id=auth_service-cargo-target-deps,target=/usr/src/app/target/release/deps \
     cargo test --release && \
     cargo build --release && \
     cp target/release/auth_service /usr/local/bin/auth_service

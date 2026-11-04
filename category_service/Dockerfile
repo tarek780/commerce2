@@ -2,17 +2,19 @@
 FROM rust:1.99.1-slim-trixie AS builder
 WORKDIR /usr/src/app
 
-RUN apt-get update && apt-get upgrade -y
 
-
-RUN apt-get install -y protobuf-compiler libssl-dev pkg-config && \
-    rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    protobuf-compiler \
+    libssl-dev \
+    pkg-config \
+    curl \
+    ca-certificates \
+    cmake \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
 
 
 COPY Cargo.toml Cargo.lock ./
-RUN mkdir src && echo "fn main() { println!(\"dummy\"); }" > src/main.rs
-RUN cargo build --release
-RUN rm -rf src
 
 
 COPY migrations ./migrations
@@ -20,17 +22,22 @@ COPY proto ./proto
 COPY src ./src
 
 
-RUN touch src/main.rs 
-RUN cargo test  --release
-RUN cargo build --release
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/src/app/target \
+    cargo test --release && \
+    cargo build --release && \
+    cp target/release/category_service /usr/local/bin/category_service
 
 
 FROM debian:trixie-slim
-RUN apt-get update && apt-get upgrade -y && \
-    apt-get install -y ca-certificates libssl3 && \
-    rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    libssl3 \
+    && rm -rf /var/lib/apt/lists/*
 
 
-COPY --from=builder /usr/src/app/target/release/category_service /usr/local/bin/category_service
+COPY --from=builder /usr/local/bin/category_service /usr/local/bin/category_service
+
 
 CMD ["category_service"]

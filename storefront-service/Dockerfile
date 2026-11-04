@@ -22,11 +22,11 @@ COPY proto ./proto
 COPY src ./src
 
 
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/usr/src/app/target \
+RUN --mount=type=cache,id=storefront_service-cargo-registry,target=/usr/local/cargo/registry \
+    --mount=type=cache,id=storefront_service-cargo-target,target=/usr/src/app/target \
     cargo test --release && \
     cargo build --release && \
-    cp target/release/storefront-service /usr/local/bin/storefront-service
+    cp target/release/storefront_service /usr/local/bin/storefront_service
 
 
 FROM debian:trixie-slim
@@ -37,6 +37,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 
-COPY --from=builder /usr/local/bin/storefront-service /usr/local/bin/storefront-service
+COPY --from=builder /usr/local/bin/storefront_service /usr/local/bin/storefront_service
 
-CMD ["storefront-service"]
+CMD ["storefront_service"]

@@ -22,8 +22,8 @@ COPY proto ./proto
 COPY src ./src
 
 
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/usr/src/app/target \
+RUN --mount=type=cache,id=inventory_servise-cargo-registry,target=/usr/local/cargo/registry \
+    --mount=type=cache,id=inventory_servise-cargo-target,target=/usr/src/app/target \
     cargo test --release && \
     cargo build --release && \
     cp target/release/inventory_servise /usr/local/bin/inventory_servise

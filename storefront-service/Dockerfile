@@ -2,11 +2,10 @@
 FROM rust:1.99.1-slim-trixie AS builder
 WORKDIR /usr/src/app
 
+RUN apt-get update && apt-get upgrade -y
 
-RUN apt-get update && apt-get upgrade -y && \
-    apt-get install -y protobuf-compiler libssl-dev pkg-config && \
+RUN apt-get install -y protobuf-compiler libssl-dev pkg-config curl ca-certificates && \
     rm -rf /var/lib/apt/lists/*
-
 
 COPY Cargo.toml Cargo.lock ./
 RUN mkdir src && echo "fn main() { println!(\"dummy\"); }" > src/main.rs

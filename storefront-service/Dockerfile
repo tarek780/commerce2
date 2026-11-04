@@ -14,7 +14,7 @@ RUN cargo build --release
 RUN rm -rf src
 
 
-COPY migrations ./migrations
+
 COPY proto ./proto
 COPY src ./src
 

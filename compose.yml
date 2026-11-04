@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   # Core Infrastructure Services
 
@@ -10,7 +12,7 @@ services:
       POSTGRES_PASSWORD: mypassword
       POSTGRES_DB: mydb
     ports:
-      - "5433:5433"
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
 
@@ -32,11 +34,9 @@ services:
       - "9092:9092"
       - "9094:9094"
     environment:
-      # 
       - KAFKA_NODE_ID=1
       - KAFKA_PROCESS_ROLES=broker,controller
       - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
-      # 
       - KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
       - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
       - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
@@ -108,7 +108,6 @@ services:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - GRPC_ADDR=0.0.0.0:6001
       - HTTP_ADDR=0.0.0.0:6000       
-      # payment gateway configuration
       - PAYMENT_GATEWAY=mock
       - GATEWAY_PUBLIC_BASE=http://localhost:6000/pay     
     
@@ -141,31 +140,29 @@ services:
     environment:
       - BIND_ADDRESS=0.0.0.0:8000
       - DATABASE_URL=postgres://myuser:mypassword@postgres:5432/mydb?sslmode=disable
-      
-      storefront-service:
-         build:
-           context: ./storefront-service
-           dockerfile: Dockerfile
-         ports:
-           - "9000:9000"
-          depends_on:
-            - category_service
-            - inventory_service
-            - payment_service
-            - cart_service
-            - order_service
-            - postgres
-            - redis
-          environment:
-            - HTTP_ADDR=0.0.0.0:9000
-            #---
-            - CART_BASE_URL=cart_service:5000
-            - CATEGORY_GRAPHQL_URL=category_service:4000
-            - ORDER_GRPC_URL=order_service:7000
-            - PAYMENT_GRPC_URL=payment_service:6001
-            - INVENTORY_GRPC_URL=inventory_service:8000
-            #---
-            - REDIS_URL=redis://:myredispassword@redis:6379
+
+  storefront-service:
+    build:
+      context: ./storefront-service
+      dockerfile: Dockerfile
+    ports:
+      - "9000:9000"
+    depends_on:
+      - category_service
+      - inventory_service
+      - payment_service
+      - cart_service
+      - order_service
+      - postgres
+      - redis
+    environment:
+      - HTTP_ADDR=0.0.0.0:9000
+      - CART_BASE_URL=cart_service:5000
+      - CATEGORY_GRAPHQL_URL=category_service:4000
+      - ORDER_GRPC_URL=order_service:7000
+      - PAYMENT_GRPC_URL=payment_service:6001
+      - INVENTORY_GRPC_URL=inventory_service:8000
+      - REDIS_URL=redis://:myredispassword@redis:6379
 
 volumes:
   pgdata:

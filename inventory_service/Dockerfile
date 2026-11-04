@@ -4,7 +4,9 @@ WORKDIR /usr/src/app
 
 
 RUN apt-get update && apt-get upgrade -y && \
+    apt-get install -y protobuf-compiler libssl-dev pkg-config && \
     rm -rf /var/lib/apt/lists/*
+
 
 
 COPY Cargo.toml Cargo.lock ./

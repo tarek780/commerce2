@@ -5,7 +5,7 @@ WORKDIR /usr/src/app
 RUN apt-get update && apt-get upgrade -y
 
 
-RUN apt-get install -y protobuf-compiler libssl-dev pkg-config && \
+RUN apt-get install -y protobuf-compiler libssl-dev pkg-config curl ca-certificates cmake g++ \
     rm -rf /var/lib/apt/lists/*
 
 

@@ -14,7 +14,7 @@ pub enum CartError {
     InvalidQuantity,
 
     #[error("unauthorized")]
-    Unauthorized,
+    Unauthorized(String),
 
     #[error("bad request: {0}")]
     BadRequest(String),
@@ -68,7 +68,7 @@ impl IntoResponse for CartError {
                 tracing::warn!(error = ?self, "Bad request made by client");
                 (StatusCode::BAD_REQUEST, msg.clone())
             }
-            CartError::Unauthorized => {
+            CartError::Unauthorized(e) => {
                 tracing::warn!(error = ?self, "Unauthorized access attempt");
                 (StatusCode::UNAUTHORIZED, self.to_string())
             }

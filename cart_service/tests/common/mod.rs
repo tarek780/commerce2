@@ -6,7 +6,7 @@ use tokio::io::stdout;
 use axum::Router;
 use tower_http::trace::TraceLayer;
 
-use cart_service::auth::layer::AuthLayer;
+use cart_service::auth::auth::AuthLayer;
 use cart_service::cart::handlers;
 use cart_service::cart::repository::{GuestCartRepo, UserCartRepo};
 use cart_service::cart::service::CartService;
@@ -25,7 +25,7 @@ pub struct TestEnv {
     pub state: Arc<AppState>,
 }
 
-pub async fn build_state() -> TestEnv {
+pub async fn build_state() -> Arc<TestEnv> {
     //
     dotenvy::dotenv().ok();
     let pg_image = GenericImage::new("postgres", "16.15-alpine3.24")
@@ -134,7 +134,7 @@ pub async fn build_state() -> TestEnv {
     });
     let state = Arc::new(AppState { cart_service });
 
-    TestEnv { state }
+    Arc::new(TestEnv { state })
 }
 
 pub async fn cleanup_redis(redis_url: &str, keys: &[&str]) {

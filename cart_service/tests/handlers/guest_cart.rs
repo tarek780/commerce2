@@ -1,9 +1,11 @@
+use std::sync::Arc;
+
 use crate::common::TestEnv;
 use cart_service::cart::model::AddItemRequest;
 use cart_service::error::CartError;
 use uuid::Uuid;
 
-pub async fn create_get_and_add_items_to_guest_cart(env: TestEnv) {
+pub async fn create_get_and_add_items_to_guest_cart(env: &Arc<TestEnv>) {
     let guest_id = match env.state.cart_service.create_guest_cart().await {
         Ok(e) => e,
         Err(e) => {
@@ -82,7 +84,7 @@ pub async fn create_get_and_add_items_to_guest_cart(env: TestEnv) {
     }
 }
 
-pub async fn add_guest_item_rejects_non_positive_quantity(env: TestEnv) {
+pub async fn add_guest_item_rejects_non_positive_quantity(env: &Arc<TestEnv>) {
     let guest_id = match env.state.cart_service.create_guest_cart().await {
         Ok(id) => id,
         Err(_) => {
@@ -120,7 +122,7 @@ pub async fn add_guest_item_rejects_non_positive_quantity(env: TestEnv) {
     }
 }
 
-pub async fn get_missing_guest_cart_returns_not_found(env: TestEnv) {
+pub async fn get_missing_guest_cart_returns_not_found(env: &Arc<TestEnv>) {
     let err = match env
         .state
         .cart_service
@@ -134,4 +136,10 @@ pub async fn get_missing_guest_cart_returns_not_found(env: TestEnv) {
         }
     };
     assert!(matches!(err, CartError::NotFound));
+}
+
+pub async fn guest_master(env: Arc<TestEnv>) {
+    add_guest_item_rejects_non_positive_quantity(&env).await;
+    create_get_and_add_items_to_guest_cart(&env).await;
+    get_missing_guest_cart_returns_not_found(&env).await;
 }

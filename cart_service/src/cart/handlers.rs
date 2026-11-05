@@ -7,7 +7,7 @@ use axum::{
 use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::auth::layer::AccessToken;
+use crate::auth::auth::AccessToken;
 use crate::cart::model::*;
 use crate::error::CartError;
 use crate::state::AppState;

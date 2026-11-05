@@ -13,7 +13,7 @@ use tower_http::trace::TraceLayer;
 use tracing_subscriber::prelude::*;
 
 use crate::{
-    auth::layer::AuthLayer,
+    auth::auth::AuthLayer,
     cart::repository::{GuestCartRepo, UserCartRepo},
     cart::service::CartService,
     state::AppState,

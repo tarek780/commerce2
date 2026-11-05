@@ -1,4 +1,4 @@
-use crate::error::AppError;
+use crate::error::CartError;
 use axum::{
     extract::Request,
     http::{StatusCode, header},
@@ -6,7 +6,7 @@ use axum::{
     response::Response,
 };
 use futures_util::future::BoxFuture;
-use jsonwebtoken::{Algorithm, DecodingKey, Header, Validation, decode};
+use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
 use serde::{Deserialize, Serialize};
 use tower::{Layer, Service};
 
@@ -23,7 +23,7 @@ pub struct Claims {
 }
 
 impl Claims {
-    pub fn decode_jwt(token: &str) -> Result<Self, AppError> {
+    pub fn decode_jwt(token: &str) -> Result<Self, CartError> {
         let secret = std::env::var("SECRET_KEY")?;
 
         let mut validation = Validation::new(Algorithm::HS256);
@@ -38,7 +38,7 @@ impl Claims {
             &DecodingKey::from_secret(secret.as_bytes()),
             &validation,
         )
-        .map_err(|e| AppError::Internal(format!("jwt decode error: {e}")))?;
+        .map_err(|e| CartError::Unauthorized(format!("jwt decode error: {e}")))?;
 
         Ok(decoded.claims)
     }
@@ -99,10 +99,8 @@ where
         };
 
         Box::pin(async move {
-
             match Claims::decode_jwt(&token) {
                 Ok(claims) => {
-
                     let data = AccessToken {
                         user_id: claims.sub,
                     };

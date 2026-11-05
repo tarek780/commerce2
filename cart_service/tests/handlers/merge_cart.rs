@@ -1,9 +1,10 @@
+use crate::common;
 use crate::common::TestEnv;
 use cart_service::cart::model::AddItemRequest;
+use std::sync::Arc;
 use uuid::Uuid;
 
-pub async fn merge_guest_into_user_combines_and_deletes_guest(env: TestEnv) {
-    
+pub async fn merge_guest_into_user_combines_and_deletes_guest(env: &Arc<TestEnv>) {
     let user_id = common::unique_user_id();
 
     match env
@@ -121,9 +122,7 @@ pub async fn merge_guest_into_user_combines_and_deletes_guest(env: TestEnv) {
     assert!(matches!(err, cart_service::error::CartError::NotFound));
 }
 
-pub async fn merge_empty_guest_cart_just_deletes_it(env: TestEnv) {
-    
-
+pub async fn merge_empty_guest_cart_just_deletes_it(env: &Arc<TestEnv>) {
     let user_id = common::unique_user_id();
     let guest_id = match env.state.cart_service.create_guest_cart().await {
         Ok(e) => e,
@@ -153,4 +152,9 @@ pub async fn merge_empty_guest_cart_just_deletes_it(env: TestEnv) {
         .await
         .unwrap_err();
     assert!(matches!(err, cart_service::error::CartError::NotFound));
+}
+
+pub async fn merge_master(env: Arc<TestEnv>) {
+    merge_empty_guest_cart_just_deletes_it(&env).await;
+    merge_guest_into_user_combines_and_deletes_guest(&env).await;
 }

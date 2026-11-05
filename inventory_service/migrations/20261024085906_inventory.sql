@@ -1,5 +1,5 @@
 CREATE TABLE inventory (
-    id UUID GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    id UUID PRIMARY KEY NOT NULL UNIQUE,
     variant_id UUID UNIQUE NOT NULL,
     stock_quantity INT NOT NULL DEFAULT 0 CHECK (stock_quantity >= 0),
     reserved_quantity INT NOT NULL DEFAULT 0 CHECK (reserved_quantity >= 0),

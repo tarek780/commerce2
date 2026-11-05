@@ -1,19 +1,17 @@
+use crate::common;
 use crate::common::TestEnv;
-
 use std::sync::Arc;
 
 use axum::body::Body;
 use axum::extract::State;
 use axum::http::{Request, StatusCode};
 use axum::response::IntoResponse;
-use cart_service::cart::repository::GuestCartRepo;
-use cart_service::cart::service::CartService;
-use cart_service::state::AppState;
+
 use serde_json::Value;
 use tower::ServiceExt;
 use uuid::Uuid;
 
-pub async fn http_guest_flow_create_add_get(env: TestEnv) {
+pub async fn http_guest_flow_create_add_get(env: &Arc<TestEnv>) {
     let app = common::build_router(env.state.clone());
     // create
     // POST /api/guest/cart
@@ -143,7 +141,7 @@ pub async fn http_guest_flow_create_add_get(env: TestEnv) {
     };
 }
 
-pub async fn http_missing_guest_cart_returns_404(env: TestEnv) {
+pub async fn http_missing_guest_cart_returns_404(env: &Arc<TestEnv>) {
     let app = common::build_router(env.state.clone());
 
     let res = match app
@@ -172,8 +170,8 @@ pub async fn http_missing_guest_cart_returns_404(env: TestEnv) {
 }
 
 /// all fn is running = ok but filled if you try to test them by routes because we need redis and db
-pub async fn c(env: TestEnv) {
-    let state = State(env.state);
+pub async fn c(env: &Arc<TestEnv>) {
+    let state = State(env.state.clone());
 
     let x = match cart_service::cart::handlers::create_guest_cart(state).await {
         Ok(o) => {
@@ -183,4 +181,10 @@ pub async fn c(env: TestEnv) {
         }
         Err(e) => format!("{e}"),
     };
+}
+
+pub async fn http_master(env: Arc<TestEnv>) {
+    http_guest_flow_create_add_get(&env).await;
+    http_missing_guest_cart_returns_404(&env).await;
+    c(&env).await;
 }

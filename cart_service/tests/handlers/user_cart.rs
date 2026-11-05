@@ -1,8 +1,10 @@
+use crate::common;
 use crate::common::TestEnv;
 use cart_service::cart::model::AddItemRequest;
+use std::sync::Arc;
 use uuid::Uuid;
 
-pub async fn user_cart_roundtrip_and_cache_invalidation(env: TestEnv) {
+pub async fn user_cart_roundtrip_and_cache_invalidation(env: &Arc<TestEnv>) {
     let user_id = common::unique_user_id();
 
     let cart = match env.state.cart_service.get_user_cart(&user_id).await {
@@ -97,7 +99,7 @@ pub async fn user_cart_roundtrip_and_cache_invalidation(env: TestEnv) {
     assert_eq!(cart.items[0].quantity, 5);
 }
 
-pub async fn bulk_add_and_validation(env: TestEnv) {
+pub async fn bulk_add_and_validation(env: &Arc<TestEnv>) {
     let user_id = common::unique_user_id();
 
     match env
@@ -176,4 +178,9 @@ pub async fn bulk_add_and_validation(env: TestEnv) {
         }
     };
     assert_eq!(sku_b.quantity, 2);
+}
+
+pub async fn user_master(env: Arc<TestEnv>) {
+    bulk_add_and_validation(&env).await;
+    user_cart_roundtrip_and_cache_invalidation(&env).await;
 }

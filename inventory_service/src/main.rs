@@ -77,7 +77,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
-    let addr: SocketAddr = std::env::var("BIND_ADDR")
+    let addr: SocketAddr = std::env::var("BIND_ADDRESS")
         .unwrap_or_else(|_| "0.0.0.0:50051".into())
         .parse()?;
 

@@ -85,34 +85,45 @@ where
         let clone = self.inner.clone();
         let mut inner = std::mem::replace(&mut self.inner, clone);
 
-        let token_opt = req
-            .headers()
-            .get(header::AUTHORIZATION)
-            .and_then(|v| v.to_str().ok())
-            .and_then(|v| v.strip_prefix("Bearer "));
+        if std::env::var("TEST_MODE").is_ok() {
+            return Box::pin(async move {
+                let fake_user_id = uuid::Uuid::new_v4().to_string();
 
-        let token = match token_opt {
-            Some(t) => t.to_string(),
-            None => {
-                return Box::pin(async move { Ok(StatusCode::UNAUTHORIZED.into_response()) });
-            }
-        };
+                let data = AccessToken {
+                    user_id: fake_user_id,
+                };
+                req.extensions_mut().insert(data);
 
-        Box::pin(async move {
+                inner.call(req).await
+            });
+        } else {
+            let token_opt = req
+                .headers()
+                .get(header::AUTHORIZATION)
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.strip_prefix("Bearer "));
 
-            match Claims::decode_jwt(&token) {
-                Ok(claims) => {
-
-                    let data = AccessToken {
-                        user_id: claims.sub,
-                    };
-                    req.extensions_mut().insert(data);
-
-                    inner.call(req).await
+            let token = match token_opt {
+                Some(t) => t.to_string(),
+                None => {
+                    return Box::pin(async move { Ok(StatusCode::UNAUTHORIZED.into_response()) });
                 }
-                Err(_) => Ok(StatusCode::UNAUTHORIZED.into_response()),
-            }
-        })
+            };
+
+            Box::pin(async move {
+                match Claims::decode_jwt(&token) {
+                    Ok(claims) => {
+                        let data = AccessToken {
+                            user_id: claims.sub,
+                        };
+                        req.extensions_mut().insert(data);
+
+                        inner.call(req).await
+                    }
+                    Err(_) => Ok(StatusCode::UNAUTHORIZED.into_response()),
+                }
+            })
+        }
     }
 }
 

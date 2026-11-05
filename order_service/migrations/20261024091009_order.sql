@@ -1,4 +1,4 @@
-CREATE TABLE orders (
+CREATE TABLE IF NOT EXISTS orders (
     id TEXT PRIMARY KEY,
     customer_id TEXT NOT NULL,
     idempotency_key TEXT NOT NULL UNIQUE,
@@ -23,18 +23,18 @@ CREATE TABLE orders (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE INDEX idx_orders_status ON orders(status);
-CREATE INDEX idx_orders_expiry ON orders(status, expires_at)
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_orders_expiry ON orders(status, expires_at)
 WHERE status IN ('pending', 'reserved', 'awaiting_payment');
-CREATE TABLE order_items (
+CREATE TABLE IF NOT EXISTS order_items (
     id BIGSERIAL PRIMARY KEY,
     order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
     variant_id INT NOT NULL,
     quantity INT NOT NULL CHECK (quantity > 0),
     unit_price NUMERIC(14, 2) NOT NULL
 );
-CREATE INDEX idx_order_items_order ON order_items(order_id);
-CREATE TABLE outbox_events (
+CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
+CREATE TABLE IF NOT EXISTS outbox_events (
     id TEXT PRIMARY KEY,
     aggregate_type TEXT NOT NULL,
     aggregate_id UUID NOT NULL,
@@ -43,5 +43,5 @@ CREATE TABLE outbox_events (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     published_at TIMESTAMPTZ
 );
-CREATE INDEX idx_outbox_unpublished ON outbox_events(created_at)
+CREATE INDEX IF NOT EXISTS idx_outbox_unpublished ON outbox_events(created_at)
 WHERE published_at IS NULL;

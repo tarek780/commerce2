@@ -8,6 +8,9 @@ pub mod pb {
     tonic::include_proto!("payment.v1");
 }
 
+use std::path::Path;
+use sqlx::migrate::Migrator;
+
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -34,7 +37,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let cfg = PaymentConfig::from_env().await?;
     let state = Arc::new(AppState::new(cfg.clone()).await?);
-    sqlx::migrate!("./migrations").run(&state.db).await?;
+    
+    
+    sqlx::migrate!("./migrations")
+    .set_ignore_missing(true) 
+    .run(&state.db)
+    .await?;
+    
     tracing::info!("migrations applied");
 
     // HTTP (webhooks)

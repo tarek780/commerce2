@@ -5,6 +5,7 @@ use axum::{
 use std::sync::Arc;
 use tower::ServiceBuilder;
 
+use crate::openapi;
 use crate::{handlers::checkout, handlers::health, handlers::order, handlers::payment};
 use crate::{middleware::auth::AuthLayer, state::AppState};
 
@@ -22,8 +23,11 @@ pub fn build(state: Arc<AppState>) -> Router {
         .route("/ready", get(health::ready))
         .with_state(state.clone());
 
+    let docs = openapi::router();
+
     Router::new()
         .merge(public)
         .merge(protected)
+        .merge(docs)
         .layer(tower_http::trace::TraceLayer::new_for_http())
 }

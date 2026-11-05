@@ -1,8 +1,9 @@
 use crate::common::{TestHarness, USER_ID, auth, fixtures::*, get_json};
 use std::sync::Arc;
 
-fn bearer_for(user: &str) -> Vec<(&'static str, String)> {
-    let token = auth::bearer(&auth::access_token_for(user));
+async fn bearer_for(user: &str) -> Vec<(&'static str, String)> {
+    let token = auth::token_gen("ACCESS", "USER", 99999).await;
+
     vec![("authorization", token)]
 }
 
@@ -16,21 +17,21 @@ pub async fn get_payment_success(h: &Arc<TestHarness>) {
         .lock()
         .await
         .push(payment_response("pay-1"));
-    let hdr = bearer_for(USER_ID);
-    let (status, json, _) = get_json(&h.app, "/api/v1/payments/pay-1", &refs(&hdr)).await;
+    let hdr = bearer_for(USER_ID).await;
+    let (status, json, _) = get_json("/api/v1/payments/pay-1", &refs(&hdr)).await;
     assert_eq!(status, 200);
     assert_eq!(json["id"], "pay-1");
     assert_eq!(json["status"], "succeeded");
 }
 
 pub async fn get_payment_not_found(h: &Arc<TestHarness>) {
-    let hdr = bearer_for(USER_ID);
-    let (status, _, _) = get_json(&h.app, "/api/v1/payments/missing", &refs(&hdr)).await;
+    let hdr = bearer_for(USER_ID).await;
+    let (status, _, _) = get_json("/api/v1/payments/missing", &refs(&hdr)).await;
     assert_eq!(status, 404);
 }
 
 pub async fn get_payment_unauthenticated_returns_401(h: &Arc<TestHarness>) {
-    let (status, _, _) = get_json(&h.app, "/api/v1/payments/pay-1", &[]).await;
+    let (status, _, _) = get_json("/api/v1/payments/pay-1", &[]).await;
     assert_eq!(status, 401);
 }
 

@@ -4,12 +4,11 @@ use crate::common::{TestHarness, USER_ID, auth, fixtures::*, post_json};
 use std::sync::Arc;
 use storefront_service::error::AppError;
 
-fn idem_headers_for(user: &str) -> Vec<(String, String)> {
+async fn idem_headers_for(user: &str) -> Vec<(String, String)> {
+    let token = auth::token_gen("ACCESS", "USER", 99999).await;
+
     vec![
-        (
-            "authorization".into(),
-            auth::bearer(&auth::access_token_for(user)),
-        ),
+        ("authorization".into(), token),
         ("idempotency-key".into(), uuid::Uuid::new_v4().to_string()),
     ]
 }
@@ -28,9 +27,8 @@ pub async fn checkout_success(h: &Arc<TestHarness>) {
         .with_prices(vec![(id, "20.00"), (id2, "20.00")])
         .await;
 
-    let headers = idem_headers_for(USER_ID);
+    let headers = idem_headers_for(USER_ID).await;
     let (status, json, _) = post_json(
-        &h.app,
         "/api/v1/checkout",
         &as_refs(&headers),
         serde_json::json!({}),
@@ -46,9 +44,8 @@ pub async fn checkout_success(h: &Arc<TestHarness>) {
 }
 
 pub async fn checkout_empty_cart_returns_400(h: &Arc<TestHarness>) {
-    let headers = idem_headers_for(USER_ID);
+    let headers = idem_headers_for(USER_ID).await;
     let (status, json, ct) = post_json(
-        &h.app,
         "/api/v1/checkout",
         &as_refs(&headers),
         serde_json::json!({}),
@@ -70,9 +67,8 @@ pub async fn checkout_insufficient_stock_maps_to_402(h: &Arc<TestHarness>) {
         available: 3,
     }));
 
-    let headers = idem_headers_for(USER_ID);
+    let headers = idem_headers_for(USER_ID).await;
     let (status, json, _) = post_json(
-        &h.app,
         "/api/v1/checkout",
         &as_refs(&headers),
         serde_json::json!({}),
@@ -92,9 +88,8 @@ pub async fn checkout_invalid_quantity_rejected(h: &Arc<TestHarness>) {
     *h.cart.items.lock().await = vec![cart_item(id, 0)];
     h.category.with_prices(vec![(id, "20.00")]).await;
 
-    let headers = idem_headers_for(USER_ID);
+    let headers = idem_headers_for(USER_ID).await;
     let (status, _, _) = post_json(
-        &h.app,
         "/api/v1/checkout",
         &as_refs(&headers),
         serde_json::json!({}),
@@ -110,9 +105,8 @@ pub async fn checkout_category_failure_maps_to_502(h: &Arc<TestHarness>) {
     *h.cart.items.lock().await = vec![cart_item(id, 1)];
     h.category.fail_for(id).await;
 
-    let headers = idem_headers_for(USER_ID);
+    let headers = idem_headers_for(USER_ID).await;
     let (status, _, _) = post_json(
-        &h.app,
         "/api/v1/checkout",
         &as_refs(&headers),
         serde_json::json!({}),
@@ -128,9 +122,8 @@ pub async fn checkout_cart_clear_failure_returns_warnings(h: &Arc<TestHarness>) 
     h.category.with_prices(vec![(id, "20.00")]).await;
     h.cart.set_fail_clear(true).await;
 
-    let headers = idem_headers_for(USER_ID);
+    let headers = idem_headers_for(USER_ID).await;
     let (status, json, _) = post_json(
-        &h.app,
         "/api/v1/checkout",
         &as_refs(&headers),
         serde_json::json!({}),

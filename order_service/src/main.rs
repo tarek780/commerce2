@@ -41,7 +41,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cfg = OrderConfig::from_env()?;
     let state = Arc::new(AppState::new(cfg.clone()).await?);
 
-    sqlx::migrate!("./migrations").run(&state.db).await?;
+    sqlx::migrate!("./migrations")
+    .set_ignore_missing(true)
+    .run(&state.db).await?;
     tracing::info!("migrations applied");
 
     // Expiry worker

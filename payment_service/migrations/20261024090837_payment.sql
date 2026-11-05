@@ -1,4 +1,5 @@
-CREATE TABLE payments (
+
+CREATE TABLE IF NOT EXISTS payments (
     id TEXT PRIMARY KEY,
     order_id TEXT NOT NULL,
     idempotency_key TEXT NOT NULL UNIQUE,
@@ -25,9 +26,12 @@ CREATE TABLE payments (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE INDEX idx_payments_order ON payments(order_id);
-CREATE INDEX idx_payments_status ON payments(status);
-CREATE TABLE payment_attempts (
+
+CREATE INDEX IF NOT EXISTS idx_payments_order ON payments(order_id);
+CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
+
+
+CREATE TABLE IF NOT EXISTS payment_attempts (
     id BIGSERIAL PRIMARY KEY,
     payment_id TEXT NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
     kind TEXT NOT NULL,
@@ -37,14 +41,18 @@ CREATE TABLE payment_attempts (
     error TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE TABLE processed_webhooks (
+
+
+CREATE TABLE IF NOT EXISTS processed_webhooks (
     gateway_event_id TEXT PRIMARY KEY,
     gateway TEXT NOT NULL,
     payment_id TEXT,
     event_type TEXT NOT NULL,
     received_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE TABLE outbox_events (
+
+
+CREATE TABLE IF NOT EXISTS outbox_events (
     id TEXT PRIMARY KEY,
     aggregate_type TEXT NOT NULL,
     aggregate_id TEXT NOT NULL,
@@ -53,5 +61,6 @@ CREATE TABLE outbox_events (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     published_at TIMESTAMPTZ
 );
-CREATE INDEX idx_outbox_unpublished ON outbox_events(created_at)
+
+CREATE INDEX IF NOT EXISTS idx_outbox_unpublished ON outbox_events(created_at)
 WHERE published_at IS NULL;

@@ -1,8 +1,8 @@
 use crate::common::{OTHER_USER_ID, TestHarness, USER_ID, auth, fixtures::*, get_json, post_json};
 use std::sync::Arc;
 
-fn bearer_for(user: &str) -> Vec<(&'static str, String)> {
-    let token = auth::bearer(&auth::access_token_for(user));
+async fn bearer_for(user: &str) -> Vec<(&'static str, String)> {
+    let token = auth::token_gen("ACCESS", "USER", 99999).await;
     vec![("authorization", token)]
 }
 
@@ -11,8 +11,8 @@ fn refs<'a>(a: &'a [(&'static str, String)]) -> Vec<(&'static str, &'a str)> {
 }
 
 pub async fn list_orders_empty(h: &Arc<TestHarness>) {
-    let hdr = bearer_for(USER_ID);
-    let (status, json, _) = get_json(&h.app, "/api/v1/orders?first=10", &refs(&hdr)).await;
+    let hdr = bearer_for(USER_ID).await;
+    let (status, json, _) = get_json("/api/v1/orders?first=10", &refs(&hdr)).await;
 
     assert_eq!(status, 200);
     assert_eq!(json["edges"].as_array().unwrap().len(), 0);
@@ -28,8 +28,8 @@ pub async fn list_orders_empty(h: &Arc<TestHarness>) {
 //         has_next_page: true,
 //         end_cursor: "cursor2".into(),
 //     });
-//     let hdr = bearer_for(USER_ID);
-//     let (status, json, _) = get_json(&h.app, "/api/v1/orders?first=2", &refs(&hdr)).await;
+//     let hdr = bearer_for(USER_ID).await;
+//     let (status, json, _) = get_json( "/api/v1/orders?first=2", &refs(&hdr)).await;
 //     assert_eq!(status, 200);
 //     assert_eq!(json["edges"].as_array().unwrap().len(), 2);
 //     assert_eq!(json["page_info"]["has_next_page"], true);
@@ -43,8 +43,8 @@ pub async fn get_order_success(h: &Arc<TestHarness>) {
         .lock()
         .await
         .push(order_response("order-1", USER_ID));
-    let hdr = bearer_for(USER_ID);
-    let (status, json, _) = get_json(&h.app, "/api/v1/orders/order-1", &refs(&hdr)).await;
+    let hdr = bearer_for(USER_ID).await;
+    let (status, json, _) = get_json("/api/v1/orders/order-1", &refs(&hdr)).await;
     assert_eq!(status, 200);
     assert_eq!(json["id"], "order-1");
 }
@@ -55,14 +55,14 @@ pub async fn get_order_not_owner_returns_404(h: &Arc<TestHarness>) {
         .lock()
         .await
         .push(order_response("order-1", OTHER_USER_ID));
-    let hdr = bearer_for(USER_ID);
-    let (status, _, _) = get_json(&h.app, "/api/v1/orders/order-1", &refs(&hdr)).await;
+    let hdr = bearer_for(USER_ID).await;
+    let (status, _, _) = get_json("/api/v1/orders/order-1", &refs(&hdr)).await;
     assert_eq!(status, 404);
 }
 
 pub async fn get_order_not_found(h: &Arc<TestHarness>) {
-    let hdr = bearer_for(USER_ID);
-    let (status, _, _) = get_json(&h.app, "/api/v1/orders/unknown", &refs(&hdr)).await;
+    let hdr = bearer_for(USER_ID).await;
+    let (status, _, _) = get_json("/api/v1/orders/unknown", &refs(&hdr)).await;
     assert_eq!(status, 404);
 }
 
@@ -72,9 +72,8 @@ pub async fn cancel_order_success(h: &Arc<TestHarness>) {
         .lock()
         .await
         .push(order_response("order-1", USER_ID));
-    let hdr = bearer_for(USER_ID);
+    let hdr = bearer_for(USER_ID).await;
     let (status, json, _) = post_json(
-        &h.app,
         "/api/v1/orders/order-1/cancel",
         &refs(&hdr),
         serde_json::json!({ "reason": "customer_request" }),
@@ -90,9 +89,8 @@ pub async fn cancel_order_not_owner_returns_404(h: &Arc<TestHarness>) {
         .lock()
         .await
         .push(order_response("order-1", OTHER_USER_ID));
-    let hdr = bearer_for(USER_ID);
+    let hdr = bearer_for(USER_ID).await;
     let (status, _, _) = post_json(
-        &h.app,
         "/api/v1/orders/order-1/cancel",
         &refs(&hdr),
         serde_json::json!({ "reason": "x" }),
@@ -108,9 +106,8 @@ pub async fn pay_order_success(h: &Arc<TestHarness>) {
         .await
         .push(order_response("order-1", USER_ID));
     *h.order.pay_response.lock().await = Some(pay_response("order-1"));
-    let hdr = bearer_for(USER_ID);
+    let hdr = bearer_for(USER_ID).await;
     let (status, json, _) = post_json(
-        &h.app,
         "/api/v1/orders/order-1/pay",
         &refs(&hdr),
         serde_json::json!({}),

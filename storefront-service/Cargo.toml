@@ -17,7 +17,7 @@ tonic-prost = "0.14"
 prost = "0.14"
 
 # HTTP client (cart, category)
-reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
 
 # Redis (idempotency)
 redis = { version = "0.25", features = ["tokio-comp", "connection-manager"] }

@@ -7,14 +7,16 @@ pub mod mocks;
 use axum::Router;
 use std::sync::Arc;
 
-use redis::aio::ConnectionManager;
-use storefront_service::config::AppConfig;
-use storefront_service::state::AppState;
-
 use self::mocks::cart::MockCartClient;
 use self::mocks::category::MockCategoryClient;
 use self::mocks::order::MockOrderClient;
 use self::mocks::payment::MockPaymentClient;
+use redis::aio::ConnectionManager;
+use reqwest::Url;
+use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderName, HeaderValue};
+use std::str::FromStr;
+use storefront_service::config::AppConfig;
+use storefront_service::state::AppState;
 
 use testcontainers::GenericImage;
 use testcontainers::{core::WaitFor, runners::AsyncRunner};
@@ -110,66 +112,84 @@ pub async fn harness() -> Arc<TestHarness> {
 //  HTTP helpers
 
 pub async fn post_json(
-    app: &Router,
     path: &str,
+
     headers: &[(&str, &str)],
     body: serde_json::Value,
 ) -> (u16, serde_json::Value, Option<String>) {
-    use axum::body::Body;
-    use axum::http::Request;
-    use http_body_util::BodyExt;
-    use tower::ServiceExt;
-
-    let mut req = Request::builder()
-        .method("POST")
-        .uri(path)
-        .header("content-type", "application/json");
-
-    for (k, v) in headers {
-        req = req.header(*k, *v);
+    let mut base_addr = std::env::var("HTTP_ADDR").expect("err from varenv");
+    if !base_addr.starts_with("http://") && !base_addr.starts_with("https://") {
+        base_addr = format!("http://{}", base_addr);
     }
 
-    let req = req
-        .body(Body::from(serde_json::to_vec(&body).unwrap()))
-        .unwrap();
-    let resp = app.clone().oneshot(req).await.unwrap();
-    let status = resp.status();
+    let base_url = Url::parse(&base_addr).expect("Invalid base URL in HTTP_ADDR");
+    let url = base_url.join(path).expect("Invalid path provided");
+
+    let mut header_map = HeaderMap::new();
+    for (k, v) in headers {
+        if let (Ok(name), Ok(value)) = (HeaderName::from_str(k), HeaderValue::from_str(v)) {
+            header_map.insert(name, value);
+        }
+    }
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .post(url)
+        .headers(header_map)
+        .json(&body)
+        .send()
+        .await
+        .expect("err from reqwest builder");
+
+    let status = resp.status().as_u16();
     let ct = resp
         .headers()
-        .get("content-type")
+        .get(reqwest::header::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
         .map(String::from);
-    let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null);
-    (status.as_u16(), json, ct)
+
+    let json: serde_json::Value = resp.json().await.unwrap_or(serde_json::Value::Null);
+
+    (status, json, ct)
 }
 
 pub async fn get_json(
-    app: &Router,
     path: &str,
     headers: &[(&str, &str)],
 ) -> (u16, serde_json::Value, Option<String>) {
-    use axum::body::Body;
-    use axum::http::Request;
-    use http_body_util::BodyExt;
-    use tower::ServiceExt;
-
-    let mut req = Request::builder().method("GET").uri(path);
-    for (k, v) in headers {
-        req = req.header(*k, *v);
+    let mut base_addr = std::env::var("HTTP_ADDR").expect("err from varenv");
+    if !base_addr.starts_with("http://") && !base_addr.starts_with("https://") {
+        base_addr = format!("http://{}", base_addr);
     }
 
-    let req = req.body(Body::empty()).unwrap();
-    let resp = app.clone().oneshot(req).await.unwrap();
-    let status = resp.status();
+    let base_url = Url::parse(&base_addr).expect("Invalid base URL in HTTP_ADDR");
+    let url = base_url.join(path).expect("Invalid path provided");
+
+    let mut header_map = HeaderMap::new();
+    for (k, v) in headers {
+        if let (Ok(name), Ok(value)) = (HeaderName::from_str(k), HeaderValue::from_str(v)) {
+            header_map.insert(name, value);
+        }
+    }
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .get(url)
+        .headers(header_map)
+        .send()
+        .await
+        .expect("err from reqwest builder");
+
+    let status = resp.status().as_u16();
     let ct = resp
         .headers()
-        .get("content-type")
+        .get(reqwest::header::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
         .map(String::from);
-    let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null);
-    (status.as_u16(), json, ct)
+
+    let json: serde_json::Value = resp.json().await.unwrap_or(serde_json::Value::Null);
+
+    (status, json, ct)
 }
 
 //

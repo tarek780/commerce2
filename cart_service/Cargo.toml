@@ -29,6 +29,7 @@ dotenvy = "0.15.7"
 jsonwebtoken = "11.1.0"
 futures-util = "0.3.34"
 sqlx-cli = "0.9.0"
+reqwest = { version = "0.13.5", features = ["json"] }
 
 [dev-dependencies]
 http-body-util = "0.1"

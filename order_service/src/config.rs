@@ -17,17 +17,24 @@ impl OrderConfig {
     pub fn from_env() -> Result<Self, Box<dyn std::error::Error>> {
         Ok(Self {
             database_url: std::env::var("DATABASE_URL")?,
-            bind_addr: std::env::var("BIND_ADDRESS").unwrap_or_else(|_| "0.0.0.0:50053".into()),
+            bind_addr: std::env::var("BIND_ADDRESS")
+                .unwrap_or_else(|_| "0.0.0.0:50053".into())
+                .parse()?,
             inventory_grpc_url: std::env::var("INVENTORY_GRPC_URL")
-                .unwrap_or_else(|_| "http://127.0.0.1:50051".into()),
+                .unwrap_or_else(|_| "http://127.0.0.1:50051".into())
+                .parse()?,
             payment_grpc_url: std::env::var("PAYMENT_GRPC_URL")
-                .unwrap_or_else(|_| "http://127.0.0.1:50052".into()),
+                .unwrap_or_else(|_| "http://127.0.0.1:50052".into())
+                .parse()?,
             kafka_brokers: std::env::var("KAFKA_BROKERS")
-                .unwrap_or_else(|_| "localhost:9092".into()),
+                .unwrap_or_else(|_| "localhost:9092".into())
+                .parse()?,
             kafka_payment_topic: std::env::var("KAFKA_PAYMENT_TOPIC")
-                .unwrap_or_else(|_| "payment.events".into()),
+                .unwrap_or_else(|_| "payment.events".into())
+                .parse()?,
             kafka_payment_group: std::env::var("KAFKA_ORDER_PAYMENT_GROUP")
-                .unwrap_or_else(|_| "order-service".into()),
+                .unwrap_or_else(|_| "order-service".into())
+                .parse()?,
             order_ttl_secs: std::env::var("ORDER_TTL_SECS")
                 .ok()
                 .and_then(|v| v.parse().ok())

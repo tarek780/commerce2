@@ -24,7 +24,7 @@ COPY src ./src
 RUN --mount=type=cache,id=cart_service-cargo-registry,target=/usr/local/cargo/registry \
 
     --mount=type=cache,id=cart_service-cargo-target-deps,target=/usr/src/app/target/release/deps  \
-    cargo run && \
+   TEST_MODE=1 cargo run && \
     cargo test --release && \
     cargo build --release && \
     cp target/release/cart_service /usr/local/bin/cart_service

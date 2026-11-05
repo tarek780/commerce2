@@ -1,5 +1,6 @@
 use std::sync::Once;
 use storefront_service::middleware::auth::Claims;
+use uuid::Uuid;
 
 static INIT: Once = Once::new();
 
@@ -42,7 +43,33 @@ fn token_with(user_id: &str, typ: &str, role: &str, exp_offset_secs: i64) -> Str
         aud: "test-audience".to_string(),
         exp: exp as usize,
         iat: now as usize,
-        jti: uuid::Uuid::new_v4().to_string(), // تحتاج مكتبة uuid لتوليد معرف فريد، أو استبدلها بنص فارغ ""
+        jti: uuid::Uuid::now_v7().to_string(),
+        typ: typ.to_string(),
+        role: role.to_string(),
+    };
+
+    jsonwebtoken::encode(
+        &Header::new(Algorithm::HS256),
+        &claims,
+        &EncodingKey::from_secret(secret().as_bytes()),
+    )
+    .expect("encode jwt")
+}
+
+pub async fn token_gen(typ: &str, role: &str, exp_offset_secs: i64) -> String {
+    use chrono::Utc;
+    use jsonwebtoken::{Algorithm, EncodingKey, Header};
+
+    let now = Utc::now().timestamp();
+    let exp = now + exp_offset_secs;
+
+    let claims = Claims {
+        sub: Uuid::now_v7().to_string(),
+        iss: "test-issuer".to_string(),
+        aud: "test-audience".to_string(),
+        exp: exp as usize,
+        iat: now as usize,
+        jti: uuid::Uuid::new_v4().to_string(),
         typ: typ.to_string(),
         role: role.to_string(),
     };

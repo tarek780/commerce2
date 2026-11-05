@@ -1,96 +1,69 @@
-use axum::body::Body;
-use axum::http::{Request, StatusCode};
 use category_service::graphql;
 use category_service::state::AppState;
+use reqwest::{Client, StatusCode};
+use serde_json::Value;
 use std::sync::Arc;
-use tower::ServiceExt; // for `oneshot`
 
-async fn app() -> axum::Router {
-    // need db + grpc (INVENTORY_GRPC_URL) + redis + appstate
-    unsafe {
-        std::env::set_var(
-            // db
-            "DATABASE_URL",
-            std::env::var("TEST_DATABASE_URL").unwrap_or_else(|_| {
-                "postgres://postgres:postgres@localhost:5432/catalog_test".into()
-            }),
-        );
-        std::env::set_var(
-            // redis
-            "REDIS_URL",
-            std::env::var("TEST_REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".into()),
-        );
-        std::env::set_var("REDIS_STREAM_KEY", "test:stream");
-        std::env::set_var("REDIS_CONSUMER_GROUP", "test-group");
-        std::env::set_var("INVENTORY_GRPC_URL", "http://127.0.0.1:50051");
-    }
-    let cfg = category_service::config::AppConfig::from_env().unwrap();
-    let state = Arc::new(AppState::new(&cfg).await.expect("AppState"));
-    graphql::router(state)
+fn get_test_config() -> (Client, String) {
+    let client = Client::new();
+    let base_url =
+        std::env::var("BIND_ADDRESS").unwrap_or_else(|_| "http://127.0.0.1:3000".to_string());
+    (client, base_url)
 }
 
 pub async fn playground_renders() {
-    let app = app().await;
-    let res = app
-        .oneshot(
-            Request::builder()
-                .uri("/graphql")
-                .body(Body::empty())
-                .unwrap(),
-        )
+    let (client, base_url) = get_test_config();
+
+    let res = client
+        .get(format!("{base_url}/graphql"))
+        .send()
         .await
-        .unwrap();
+        .expect("Failed to send GET /graphql");
+
     assert_eq!(res.status(), StatusCode::OK);
-    let body = axum::body::to_bytes(res.into_body(), usize::MAX)
+
+    let html = res
+        .text()
         .await
-        .unwrap();
-    let html = String::from_utf8(body.to_vec()).unwrap();
+        .expect("Failed to read response body as text");
     assert!(html.contains("GraphQL"));
 }
 
 pub async fn query_products_returns_connection() {
-    let app = app().await;
+    let (client, base_url) = get_test_config();
+
     let payload = serde_json::json!({
         "query": "{ products(page: { first: 5 }) { totalCount edges { cursor node { id name slug } } pageInfo { hasNextPage endCursor } } }"
     });
-    let res = app
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/graphql")
-                .header("content-type", "application/json")
-                .body(Body::from(payload.to_string()))
-                .unwrap(),
-        )
+
+    let res = client
+        .post(format!("{base_url}/graphql"))
+        .json(&payload)
+        .send()
         .await
-        .unwrap();
+        .expect("Failed to send POST /graphql for query");
+
     assert_eq!(res.status(), StatusCode::OK);
-    let bytes = axum::body::to_bytes(res.into_body(), usize::MAX)
-        .await
-        .unwrap();
-    let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+
+    let body: Value = res.json().await.expect("Failed to parse response JSON");
     assert!(body["errors"].is_null(), "unexpected errors: {body}");
     assert!(body["data"]["products"].is_object());
     assert!(body["data"]["products"]["edges"].is_array());
 }
 
 pub async fn mutation_without_auth_returns_error() {
-    let app = app().await;
+    let (client, base_url) = get_test_config();
+
     let payload = serde_json::json!({
         "query": "mutation { createCategory(input: { name: \"X\" }) }"
     });
-    let res = app
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/graphql")
-                .header("content-type", "application/json")
-                .body(Body::from(payload.to_string()))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
 
+    let res = client
+        .post(format!("{base_url}/graphql"))
+        .json(&payload)
+        .send()
+        .await
+        .expect("Failed to send POST /graphql for mutation");
     let status = res.status();
     assert!(status == StatusCode::OK || status == StatusCode::INTERNAL_SERVER_ERROR);
 }

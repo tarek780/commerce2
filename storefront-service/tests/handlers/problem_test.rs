@@ -2,9 +2,8 @@ use crate::common::{TestHarness, USER_ID, auth, get_json};
 use std::sync::Arc;
 
 pub async fn problem_details_follows_rfc7807(h: &Arc<TestHarness>) {
-    let token = auth::access_token_for(USER_ID);
+    let token = auth::token_gen("ACCESS", "USER", 99999).await;
     let (status, json, ct) = get_json(
-        &h.app,
         "/api/v1/orders/missing",
         &[("authorization", &auth::bearer(&token))],
     )
@@ -24,7 +23,7 @@ pub async fn problem_details_follows_rfc7807(h: &Arc<TestHarness>) {
 }
 
 pub async fn unauthorized_response_is_plain_401(h: &Arc<TestHarness>) {
-    let (status, _, _) = get_json(&h.app, "/api/v1/orders", &[]).await;
+    let (status, _, _) = get_json("/api/v1/orders", &[]).await;
     assert_eq!(status, 401);
 }
 

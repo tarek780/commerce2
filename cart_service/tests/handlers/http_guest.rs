@@ -1,124 +1,61 @@
 use crate::common;
 use crate::common::TestEnv;
-use std::sync::Arc;
-
-use axum::body::Body;
-use axum::extract::State;
-use axum::http::{Request, StatusCode};
-use axum::response::IntoResponse;
-
+use reqwest::{Client, StatusCode};
 use serde_json::Value;
-use tower::ServiceExt;
+use std::sync::Arc;
 use uuid::Uuid;
 
-pub async fn http_guest_flow_create_add_get(env: &Arc<TestEnv>) {
-    let app = common::build_router(env.state.clone());
-    // create
-    // POST /api/guest/cart
-    let res = match app
-        .clone()
-        .oneshot(
-            match Request::builder()
-                .method("POST")
-                .uri("/api/guest/cart")
-                .body(Body::empty())
-            {
-                Ok(e) => e,
-                Err(e) => {
-                    eprintln!("error: {e}");
-                    return;
-                }
-            },
-        )
+fn get_base_url() -> String {
+    std::env::var("TEST_APP_URL").unwrap_or_else(|_| "http://127.0.0.1:3000".to_string())
+}
+
+pub async fn http_guest_flow_create_add_get(_env: &Arc<TestEnv>) {
+    let client = Client::new();
+    let base_url = get_base_url();
+
+    // 1. Create: POST /api/guest/cart
+    let res = client
+        .post(format!("{base_url}/api/guest/cart"))
+        .send()
         .await
-    {
-        Ok(e) => e,
-        Err(e) => {
-            eprintln!("error: {e}");
-            return;
-        }
-    };
+        .expect("Failed to send POST /api/guest/cart");
 
     assert_eq!(res.status(), StatusCode::OK);
-    //
-    let body = match axum::body::to_bytes(res.into_body(), usize::MAX).await {
-        Ok(e) => e,
-        Err(e) => {
-            eprintln!("error: {e}");
-            return;
-        }
-    };
-    let json: Value = serde_json::from_slice(&body).unwrap();
-    let guest_id = json["guest_cart_id"].as_str().unwrap().to_string();
 
-    // POST /api/guest/cart/:id/items
+    let json: Value = res.json().await.expect("Failed to parse JSON response");
+    let guest_id = json["guest_cart_id"]
+        .as_str()
+        .expect("guest_cart_id not found or not a string")
+        .to_string();
+
+    // 2. Add: POST /api/guest/cart/:id/items
     let uuid = Uuid::now_v7();
-    let p = cart_service::cart::model::AddItemRequest {
+    let payload = cart_service::cart::model::AddItemRequest {
         variant_id: uuid,
         quantity: 1,
         price: 100.0,
     };
 
-    let payload = serde_json::to_string(&p).unwrap();
-    // add
-    let res = match app
-        .clone()
-        .oneshot(
-            match Request::builder()
-                .method("POST")
-                .uri(format!("/api/guest/cart/{guest_id}/items"))
-                .header("content-type", "application/json")
-                .body(Body::from(payload))
-            {
-                Ok(e) => e,
-                Err(e) => {
-                    eprintln!("error: {e}");
-                    return;
-                }
-            },
-        )
+    let res = client
+        .post(format!("{base_url}/api/guest/cart/{guest_id}/items"))
+        .json(&payload)
+        .send()
         .await
-    {
-        Ok(e) => e,
-        Err(e) => {
-            eprintln!("error: {e}");
-            return;
-        }
-    };
+        .expect("Failed to send POST /api/guest/cart/:id/items");
+
     assert_eq!(res.status(), StatusCode::OK);
 
-    // GET /api/guest/cart/:id
-    let res = match app
-        .oneshot(
-            match Request::builder()
-                .method("GET")
-                .uri(format!("/api/guest/cart/{guest_id}"))
-                .body(Body::empty())
-            {
-                Ok(e) => e,
-                Err(e) => {
-                    eprintln!("error: {e}");
-                    return;
-                }
-            },
-        )
+    // 3. Get: GET /api/guest/cart/:id
+    let res = client
+        .get(format!("{base_url}/api/guest/cart/{guest_id}"))
+        .send()
         .await
-    {
-        Ok(e) => e,
-        Err(e) => {
-            eprintln!("error: {e}");
-            return;
-        }
-    };
+        .expect("Failed to send GET /api/guest/cart/:id");
+
     assert_eq!(res.status(), StatusCode::OK);
-    let body = match axum::body::to_bytes(res.into_body(), usize::MAX).await {
-        Ok(e) => e,
-        Err(e) => {
-            eprintln!("error: {e}");
-            return;
-        }
-    };
-    let json: Value = serde_json::from_slice(&body).unwrap();
+
+    let json: Value = res.json().await.expect("Failed to parse JSON response");
+
     let variant = json["items"][0]["variant_id"].as_str();
     match variant {
         Some(e) => {
@@ -129,58 +66,33 @@ pub async fn http_guest_flow_create_add_get(env: &Arc<TestEnv>) {
             return;
         }
     }
-
     assert_eq!(json["items"][0]["quantity"], 1);
-
-    match env.state.cart_service.guest_repo.delete(&guest_id).await {
-        Ok(e) => e,
-        Err(e) => {
-            eprintln!("error: {e}");
-            return;
-        }
-    };
 }
 
-pub async fn http_missing_guest_cart_returns_404(env: &Arc<TestEnv>) {
-    let app = common::build_router(env.state.clone());
+pub async fn http_missing_guest_cart_returns_404(_env: &Arc<TestEnv>) {
+    let client = Client::new();
+    let base_url = get_base_url();
 
-    let res = match app
-        .oneshot(
-            match Request::builder()
-                .method("GET")
-                .uri("/api/guest/cart/nonexistent-id")
-                .body(Body::empty())
-            {
-                Ok(e) => e,
-                Err(e) => {
-                    eprintln!("error: {e}");
-                    return;
-                }
-            },
-        )
+    let res = client
+        .get(format!("{base_url}/api/guest/cart/nonexistent-id"))
+        .send()
         .await
-    {
-        Ok(e) => e,
-        Err(e) => {
-            eprintln!("error: {e}");
-            return;
-        }
-    };
+        .expect("Failed to send GET for nonexistent cart");
+
     assert_eq!(res.status(), StatusCode::NOT_FOUND);
 }
 
-/// all fn is running = ok but filled if you try to test them by routes because we need redis and db
-pub async fn c(env: &Arc<TestEnv>) {
-    let state = State(env.state.clone());
+pub async fn c(_env: &Arc<TestEnv>) {
+    let client = Client::new();
+    let base_url = get_base_url();
 
-    let x = match cart_service::cart::handlers::create_guest_cart(state).await {
-        Ok(o) => {
-            let d = o.into_response();
-            assert_eq!(d.status(), StatusCode::OK);
-            "StatusCode::OK".to_string()
-        }
-        Err(e) => format!("{e}"),
-    };
+    let res = client
+        .post(format!("{base_url}/api/guest/cart"))
+        .send()
+        .await
+        .expect("Failed to create guest cart");
+
+    assert_eq!(res.status(), StatusCode::OK);
 }
 
 pub async fn http_master(env: Arc<TestEnv>) {

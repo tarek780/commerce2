@@ -2,8 +2,9 @@ use chrono::Utc;
 use storefront_service::clients::order::pb_order::{OrderResponse, PayOrderResponse};
 use storefront_service::clients::payment::pb_payment::PaymentResponse;
 use storefront_service::dto::cart::{CartItem, CartResponse};
+use uuid::Uuid;
 
-pub fn cart_item(variant_id: i64, quantity: i32) -> CartItem {
+pub fn cart_item(variant_id: Uuid, quantity: i32) -> CartItem {
     CartItem {
         variant_id,
         quantity,
@@ -13,7 +14,10 @@ pub fn cart_item(variant_id: i64, quantity: i32) -> CartItem {
 }
 
 pub fn cart_response(items: Vec<CartItem>) -> CartResponse {
-    CartResponse { items, updated_at: Utc::now() }
+    CartResponse {
+        items,
+        updated_at: Utc::now(),
+    }
 }
 
 pub fn order_response(id: &str, customer_id: &str) -> OrderResponse {

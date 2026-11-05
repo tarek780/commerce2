@@ -1,7 +1,8 @@
-use redis::Client;
+use std::sync::Arc;
+
+use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
-use sqlx::{PgPool, Pool, Postgres};
-use testcontainers::{ContainerAsync, GenericImage};
+use testcontainers::GenericImage;
 use testcontainers::{
     core::{ImageExt, WaitFor},
     runners::AsyncRunner,
@@ -53,7 +54,7 @@ pub async fn setup() -> PgPool {
     pool
 }
 
-pub async fn build_state() -> (PgPool, ContainerAsync<GenericImage>) {
+pub async fn build_state() -> Arc<PgPool> {
     //
     dotenvy::dotenv().ok();
     let pg_image = GenericImage::new("postgres", "16.15-alpine3.24")
@@ -132,5 +133,5 @@ pub async fn build_state() -> (PgPool, ContainerAsync<GenericImage>) {
     //
 
     //
-    (pool, pg_container)
+    Arc::new(pool)
 }

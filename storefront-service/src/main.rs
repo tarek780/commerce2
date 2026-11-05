@@ -1,25 +1,27 @@
-mod clients;
-mod config;
-mod dto;
-mod error;
-mod handlers;
-mod helpers;
-mod middleware;
-mod openapi;
-mod problem;
-mod routes;
-mod state;
+pub mod clients;
+pub mod config;
+pub mod dto;
+pub mod error;
+pub mod handlers;
+pub mod helpers;
+pub mod middleware;
+pub mod openapi;
+pub mod problem;
+pub mod routes;
+pub mod state;
 
 use std::sync::Arc;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenvy::dotenv().ok();
 
     tracing_subscriber::registry()
-        .with(EnvFilter::try_from_default_env()
-            .unwrap_or_else(|_| "storefront_service=debug,tower_http=info".into()))
+        .with(
+            EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "storefront_service=debug,tower_http=info".into()),
+        )
         .with(tracing_subscriber::fmt::layer().json())
         .init();
 
@@ -43,11 +45,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn shutdown_signal() {
-    let ctrl_c = async { tokio::signal::ctrl_c().await.ok(); };
+    let ctrl_c = async {
+        tokio::signal::ctrl_c().await.ok();
+    };
     #[cfg(unix)]
     let term = async {
         tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-            .unwrap().recv().await;
+            .unwrap()
+            .recv()
+            .await;
     };
     #[cfg(not(unix))]
     let term = std::future::pending::<()>();

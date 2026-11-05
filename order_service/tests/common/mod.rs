@@ -7,12 +7,15 @@ use testcontainers::{
     runners::AsyncRunner,
 };
 
-pub async fn setup_pool() -> (PgPool, String, String) {
-    unsafe {
-        std::env::set_var("SECRET_KEY", "test-secret-key-32-chars-minimum-xx");
-        std::env::set_var("RUST_LOG", "info");
-        std::env::set_var("RUST_BACKTRACE", "1");
-    }
+pub struct TestAppState {
+    pub pool: PgPool,
+    pub appstate: Arc<AppState>,
+    pub database_url: String,
+    pub kafka_brokers: String,
+}
+
+pub async fn setup_test_state() -> Arc<TestAppState> {
+    dotenvy::dotenv().ok();
     // pg 16.15-alpine3.24 is the latest version as of 2024-06-05
     let pg_image = GenericImage::new("postgres", "16.15-alpine3.24")
         .with_wait_for(WaitFor::message_on_stdout(
@@ -66,8 +69,14 @@ pub async fn setup_pool() -> (PgPool, String, String) {
             .await
             .expect("Failed to get Kafka container port")
     );
+    let appstate = setup_state(pool.clone(), database_url.clone(), kafka_brokers.clone()).await;
 
-    (pool, database_url, kafka_brokers)
+    Arc::new(TestAppState {
+        pool,
+        database_url,
+        kafka_brokers,
+        appstate,
+    })
 }
 
 pub async fn cleanup(pool: &PgPool) {
@@ -79,7 +88,6 @@ pub async fn cleanup(pool: &PgPool) {
 
 pub async fn setup_state(pool: PgPool, db_url: String, kafka: String) -> Arc<AppState> {
     use order_service::config::OrderConfig;
-
     let cfg = OrderConfig {
         database_url: db_url,
         bind_addr: std::env::var("BIND_ADDR").unwrap_or_else(|_| "0.0.0.0:0".into()),
@@ -93,19 +101,15 @@ pub async fn setup_state(pool: PgPool, db_url: String, kafka: String) -> Arc<App
         order_ttl_secs: 900,
         expiry_scan_secs: 30,
     };
-
     use order_service::clients::inventory::InventoryClient;
     use order_service::clients::payment::PaymentClient;
     use tonic::transport::Endpoint;
-
     let inv_channel = Endpoint::from_shared(cfg.inventory_grpc_url.clone())
         .unwrap()
         .connect_lazy();
-
     let pay_channel = Endpoint::from_shared(cfg.payment_grpc_url.clone())
         .unwrap()
         .connect_lazy();
-
     Arc::new(AppState {
         db: pool,
         inventory: Arc::new(InventoryClient::new(inv_channel)),

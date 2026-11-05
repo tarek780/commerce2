@@ -111,7 +111,7 @@ impl TestContext {
 
     //
 
-    pub async fn new() -> Self {
+    pub async fn new() -> Arc<Self> {
         dotenvy::dotenv().ok();
 
         let pg_image = GenericImage::new("postgres", "16.15-alpine3.24")
@@ -212,13 +212,13 @@ impl TestContext {
 
         let state = Arc::new(AppState::new_for_tests(pool.clone(), redis.clone()));
 
-        Self {
+        Arc::new(Self {
             _pg: pg_container,
             _redis: redis_container,
             pool,
             redis,
             state,
-        }
+        })
     }
 
     //

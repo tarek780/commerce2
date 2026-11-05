@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 
 use std::sync::Arc;
-use std::time::Duration;
 
 use inventory_service::inventory::repo::InventoryRepo;
 use inventory_service::inventory::service::InventorySvc;
@@ -10,12 +9,11 @@ use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
 use tokio::sync::broadcast;
 
+use testcontainers::GenericImage;
 use testcontainers::{
-    ContainerAsync,
-    core::{Image, ImageExt, IntoContainerPort, WaitFor},
+    core::{ImageExt, WaitFor},
     runners::AsyncRunner,
 };
-use testcontainers::{ContainerRequest, GenericImage};
 use tokio::io::AsyncWriteExt;
 use tokio::io::stdout;
 use uuid::Uuid;
@@ -27,12 +25,8 @@ pub struct TestEnv {
     pub svc: InventorySvc,
 }
 
-pub async fn build_env() -> Option<TestEnv> {
-    unsafe {
-        std::env::set_var("SECRET_KEY", "test-secret-key-32-chars-minimum-xx");
-        std::env::set_var("RUST_LOG", "info");
-        std::env::set_var("RUST_BACKTRACE", "1");
-    }
+pub async fn build_env() -> Arc<TestEnv> {
+    dotenvy::dotenv().ok();
 
     let pg_image = GenericImage::new("postgres", "16.15-alpine3.24")
         .with_wait_for(WaitFor::message_on_stdout(
@@ -77,7 +71,7 @@ pub async fn build_env() -> Option<TestEnv> {
     let repo = Arc::new(InventoryRepo::new(pool.clone()));
     let svc = InventorySvc::new(repo.clone(), stock_tx.clone());
 
-    Some(TestEnv {
+    Arc::new(TestEnv {
         pool,
         repo,
         stock_tx,
@@ -85,18 +79,18 @@ pub async fn build_env() -> Option<TestEnv> {
     })
 }
 
-#[macro_export]
-macro_rules! require_db {
-    () => {
-        match common::build_env().await {
-            Some(env) => env,
-            None => {
-                eprintln!("skip: DATABASE_URL not set or DB unreachable");
-                return;
-            }
-        }
-    };
-}
+// #[macro_export]
+// macro_rules! require_db {
+//     () => {
+//         match common::build_env().await {
+//             Some(env) => env,
+//             None => {
+//                 eprintln!("skip: DATABASE_URL not set or DB unreachable");
+//                 return;
+//             }
+//         }
+//     };
+// }
 
 pub fn new_variant_id() -> i32 {
     // 1..=2_000_000_000

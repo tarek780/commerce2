@@ -99,11 +99,10 @@ where
         };
 
         Box::pin(async move {
-
             match Claims::decode_jwt(&token) {
                 Ok(claims) => {
-
                     let data = AccessToken {
+                        role: claims.role,
                         user_id: claims.sub,
                     };
                     req.extensions_mut().insert(data);
@@ -119,4 +118,5 @@ where
 #[derive(Clone, Debug)]
 pub struct AccessToken {
     pub user_id: String,
+    pub role: String,
 }

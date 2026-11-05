@@ -1,32 +1,36 @@
 use async_trait::async_trait;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use uuid::Uuid;
 
-use storefront_service::clients::order::pb_order::{
-    ListOrdersResponse, OrderResponse, PayOrderResponse,
-};
 use storefront_service::clients::order::OrderClient;
+use storefront_service::clients::order::pb_order::{OrderResponse, PayOrderResponse};
 use storefront_service::error::{AppError, AppResult};
 
 #[derive(Default)]
 pub struct MockOrderClient {
     pub orders: Arc<Mutex<Vec<OrderResponse>>>,
     pub create_response: Arc<Mutex<Option<Result<OrderResponse, AppError>>>>,
-    pub list_response: Arc<Mutex<Option<ListOrdersResponse>>>,
+    // pub list_response: Arc<Mutex<Option<ListOrdersResponse>>>,
     pub pay_response: Arc<Mutex<Option<PayOrderResponse>>>,
     pub cancel_response: Arc<Mutex<Option<Result<OrderResponse, AppError>>>>,
     pub create_calls: Arc<Mutex<usize>>,
 }
 
 impl MockOrderClient {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 }
 
 #[async_trait]
 impl OrderClient for MockOrderClient {
     async fn create_order(
-        &self, _customer_id: &str, _currency: &str,
-        _items: Vec<(i64, i32, String)>, _idempotency_key: &str,
+        &self,
+        _customer_id: &str,
+        _currency: &str,
+        _items: Vec<(Uuid, i32, String)>,
+        _idempotency_key: &str,
     ) -> AppResult<OrderResponse> {
         *self.create_calls.lock().await += 1;
         if let Some(resp) = self.create_response.lock().await.take() {
@@ -47,7 +51,10 @@ impl OrderClient for MockOrderClient {
     }
 
     async fn get_order(&self, order_id: &str) -> AppResult<OrderResponse> {
-        self.orders.lock().await.iter()
+        self.orders
+            .lock()
+            .await
+            .iter()
             .find(|o| o.id == order_id)
             .cloned()
             .ok_or_else(|| AppError::NotFound("order not found".into()))
@@ -77,16 +84,20 @@ impl OrderClient for MockOrderClient {
         })
     }
 
-    async fn list_orders(
-        &self, _customer_id: &str, _first: i32, _after: &str, _status: &str,
-    ) -> AppResult<ListOrdersResponse> {
-        if let Some(r) = self.list_response.lock().await.take() {
-            return Ok(r);
-        }
-        Ok(ListOrdersResponse {
-            edges: vec![],
-            has_next_page: false,
-            end_cursor: String::new(),
-        })
-    }
+    // async fn list_orders(
+    //     &self,
+    //     _customer_id: &str,
+    //     _first: i32,
+    //     _after: &str,
+    //     _status: &str,
+    // ) -> AppResult<ListOrdersResponse> {
+    //     if let Some(r) = self.list_response.lock().await.take() {
+    //         return Ok(r);
+    //     }
+    //     Ok(ListOrdersResponse {
+    //         edges: vec![],
+    //         has_next_page: false,
+    //         end_cursor: String::new(),
+    //     })
+    // }
 }

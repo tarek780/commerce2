@@ -1,12 +1,17 @@
 use redis::Client;
-use redis::aio::MultiplexedConnection;
+use redis::aio::{ConnectionManager, MultiplexedConnection};
 
 use testcontainers::{ContainerAsync, GenericImage};
 use testcontainers::{core::WaitFor, runners::AsyncRunner};
 use tokio::io::AsyncWriteExt;
 use tokio::io::stdout;
 
-pub async fn setup() -> (Client, MultiplexedConnection, ContainerAsync<GenericImage>) {
+pub async fn setup() -> (
+    Client,
+    ConnectionManager,
+    MultiplexedConnection,
+    ContainerAsync<GenericImage>,
+) {
     dotenvy::dotenv().ok();
 
     let redis_image = GenericImage::new("redis", "alpine3.23")
@@ -34,7 +39,8 @@ pub async fn setup() -> (Client, MultiplexedConnection, ContainerAsync<GenericIm
         .get_multiplexed_async_connection()
         .await
         .expect("redis connection");
-    (redis_client, redis, redis_container)
+    let redis_manager = ConnectionManager::new(redis_client.clone()).await.unwrap();
+    (redis_client, redis_manager, redis, redis_container)
     //
 }
 

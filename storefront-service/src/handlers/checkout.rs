@@ -1,4 +1,10 @@
-use crate::helpers::idempotency::{IdempotencyStore , RedisIdempotencyStore, key_from_header_or_new};
+use crate::dto::checkout::CheckoutResponse;
+use crate::error::{AppError, AppResult};
+use crate::helpers::idempotency::{
+    IdempotencyStore, RedisIdempotencyStore, key_from_header_or_new,
+};
+use crate::middleware::auth::AccessToken;
+use crate::state::AppState;
 use axum::{
     Json,
     extract::{Extension, State},
@@ -6,16 +12,23 @@ use axum::{
     response::IntoResponse,
 };
 use bigdecimal::BigDecimal;
-use std::str::FromStr;
+use redis::aio::ConnectionManager;
 use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::dto::checkout::CheckoutResponse;
-use crate::error::{AppError, AppResult};
-use crate::middleware::auth::AccessToken;
-use crate::state::AppState;
-
 /// POST /api/v1/checkout
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/checkout",
+    params(
+        ("idempotency-key" = String , Header , description = "idempotency-key")
+    ),
+    responses(
+        (status = 200, description = "Success"
+        )
+    )
+)]
 pub async fn checkout(
     State(state): State<Arc<AppState>>,
     Extension(auth): Extension<AccessToken>,
@@ -35,19 +48,18 @@ pub async fn checkout(
         ));
     }
 
-   let redis_client = redis::Client::open(state.cfg.redis_url.clone())
+    let redis_client = redis::Client::open(state.cfg.redis_url.clone())
         .map_err(|e| AppError::Internal(format!("redis: {e}")))?;
 
-    let store: RedisIdempotencyStore = helpers::idempotency::RedisIdempotencyStore::new(
+    let store: RedisIdempotencyStore = RedisIdempotencyStore::new(
         ConnectionManager::new(redis_client)
             .await
             .map_err(|e| AppError::Internal(format!("redis conn: {e}")))?,
         state.cfg.idempotency_ttl_secs,
     );
-    store
 
     // 1) idempotency
-    if let Some(cached) = store.try_reserve(&mut redis, &idem_key).await? {
+    if let Some(cached) = store.try_reserve(&idem_key).await? {
         tracing::info!(user_id = %user_id, "checkout idempotency hit");
         let parsed: CheckoutResponse = serde_json::from_str(&cached)
             .map_err(|e| AppError::Internal(format!("idem decode: {e}")))?;
@@ -60,8 +72,8 @@ pub async fn checkout(
         return Err(AppError::Cart("cart is empty".into()));
     }
 
-    // 3) resolve prices من Category (client)
-    let mut order_items: Vec<(i64, i32, String)> = Vec::with_capacity(cart.items.len());
+    // 3) resolve prices from Category (client)
+    let mut order_items: Vec<(Uuid, i32, String)> = Vec::with_capacity(cart.items.len());
     for item in &cart.items {
         if item.quantity <= 0 {
             return Err(AppError::Validation(format!(
@@ -104,7 +116,7 @@ pub async fn checkout(
     // 6) store idempotent result
     let body = serde_json::to_string(&resp)
         .map_err(|e| AppError::Internal(format!("idem encode: {e}")))?;
-    let _ = store.store_result(&mut redis, &idem_key, &body).await;
+    let _ = store.store_result(&idem_key, &body).await;
 
     Ok((StatusCode::CREATED, Json(resp)))
 }
@@ -117,30 +129,28 @@ async fn extract_payment_url(payment_id: &str, _state: &AppState) -> String {
     }
 }
 
-use crate::helpers::idempotency::key_from_header_or_new;
+// pub async fn checkoutt(
+//     State(state): State<Arc<AppState>>,
+//     CurrentUser(user_id): CurrentUser,
+//     headers: HeaderMap,
+// ) -> AppResult<impl IntoResponse> {
+//     let idem_header = headers.get("idempotency-key").and_then(|v| v.to_str().ok());
+//     let (idem_key, from_header) = key_from_header_or_new(idem_header);
 
-pub async fn checkoutt(
-    State(state): State<Arc<AppState>>,
-    CurrentUser(user_id): CurrentUser,
-    headers: HeaderMap,
-) -> AppResult<impl IntoResponse> {
-    let idem_header = headers.get("idempotency-key").and_then(|v| v.to_str().ok());
-    let (idem_key, from_header) = key_from_header_or_new(idem_header);
+//     if state.cfg.idempotency_required && !from_header {
+//         return Err(AppError::Validation(
+//             "Idempotency-Key header is required".into(),
+//         ));
+//     }
 
-    if state.cfg.idempotency_required && !from_header {
-        return Err(AppError::Validation(
-            "Idempotency-Key header is required".into(),
-        ));
-    }
+//     if let Some(cached) = state.idempotency.try_reserve(&idem_key).await? {
+//         let parsed: CheckoutResponse = serde_json::from_str(&cached)
+//             .map_err(|e| AppError::Internal(format!("idem decode: {e}")))?;
+//         return Ok((StatusCode::CREATED, Json(parsed)));
+//     }
 
-    if let Some(cached) = state.idempotency.try_reserve(&idem_key).await? {
-        let parsed: CheckoutResponse = serde_json::from_str(&cached)
-            .map_err(|e| AppError::Internal(format!("idem decode: {e}")))?;
-        return Ok((StatusCode::CREATED, Json(parsed)));
-    }
-
-    let body = serde_json::to_string(&resp)
-        .map_err(|e| AppError::Internal(format!("idem encode: {e}")))?;
-    let _ = state.idempotency.store_result(&idem_key, &body).await;
-    Ok((StatusCode::CREATED, Json(resp)))
-}
+//     let body = serde_json::to_string(&resp)
+//         .map_err(|e| AppError::Internal(format!("idem encode: {e}")))?;
+//     let _ = state.idempotency.store_result(&idem_key, &body).await;
+//     Ok((StatusCode::CREATED, Json(resp)))
+// }

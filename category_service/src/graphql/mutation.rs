@@ -1,5 +1,5 @@
 use crate::graphql::context::GqlContext;
-use crate::middleware::auth::{AccessToken, Role};
+use crate::middleware::auth::AccessToken;
 use crate::redis::stream::{CatalogEvent, publish};
 use async_graphql::{Context, ID, InputObject, Object, Result as GqlResult};
 use uuid::Uuid;
@@ -41,7 +41,7 @@ impl MutationRoot {
         input: CreateCategoryInput,
     ) -> GqlResult<bool> {
         let role = ctx.data_unchecked::<AccessToken>().role.clone();
-        if role != Role::Admin {
+        if role != "ADMIN" {
             return Err(async_graphql::Error::new("Unauthorized"));
         }
         let gql = ctx.data_unchecked::<GqlContext>().clone();
@@ -71,7 +71,7 @@ impl MutationRoot {
         parent_id: Option<i64>,
     ) -> GqlResult<bool> {
         let role = ctx.data_unchecked::<AccessToken>().role.clone();
-        if role != Role::Admin {
+        if role != "ADMIN" {
             return Err(async_graphql::Error::new("Unauthorized"));
         }
         let gql = ctx.data_unchecked::<GqlContext>().clone();
@@ -91,7 +91,7 @@ impl MutationRoot {
 
     async fn delete_category(&self, ctx: &Context<'_>, id: ID) -> GqlResult<bool> {
         let role = ctx.data_unchecked::<AccessToken>().role.clone();
-        if role != Role::Admin {
+        if role != "ADMIN" {
             return Err(async_graphql::Error::new("Unauthorized"));
         }
         let gql = ctx.data_unchecked::<GqlContext>().clone();
@@ -112,7 +112,7 @@ impl MutationRoot {
         input: CreateProductInput,
     ) -> GqlResult<bool> {
         let role = ctx.data_unchecked::<AccessToken>().role.clone();
-        if role != Role::Admin {
+        if role != "ADMIN" {
             return Err(async_graphql::Error::new("Unauthorized"));
         }
         let gql = ctx.data_unchecked::<GqlContext>().clone();
@@ -148,7 +148,7 @@ impl MutationRoot {
         is_active: Option<bool>,
     ) -> GqlResult<bool> {
         let role = ctx.data_unchecked::<AccessToken>().role.clone();
-        if role != Role::Admin {
+        if role != "ADMIN" {
             return Err(async_graphql::Error::new("Unauthorized"));
         }
         let gql = ctx.data_unchecked::<GqlContext>().clone();
@@ -169,7 +169,7 @@ impl MutationRoot {
 
     async fn delete_product(&self, ctx: &Context<'_>, id: ID) -> GqlResult<bool> {
         let role = ctx.data_unchecked::<AccessToken>().role.clone();
-        if role != Role::Admin {
+        if role != "ADMIN" {
             return Err(async_graphql::Error::new("Unauthorized"));
         }
         let gql = ctx.data_unchecked::<GqlContext>().clone();
@@ -190,7 +190,7 @@ impl MutationRoot {
         input: CreateVariantInput,
     ) -> GqlResult<bool> {
         let role = ctx.data_unchecked::<AccessToken>().role.clone();
-        if role != Role::Admin {
+        if role != "ADMIN" {
             return Err(async_graphql::Error::new("Unauthorized"));
         }
         let gql = ctx.data_unchecked::<GqlContext>().clone();

@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CartResponse {
@@ -10,7 +11,7 @@ pub struct CartResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CartItem {
-    pub variant_id: String,
+    pub variant_id: Uuid,
     pub quantity: i32,
     pub price_at_add: Option<f64>,
     pub added_at: DateTime<Utc>,

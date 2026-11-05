@@ -1,11 +1,12 @@
+use axum::Json;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::Json;
 use serde::Serialize;
 use serde_json::Value;
+use utoipa::ToSchema;
 
 /// RFC 7807 Problem Details
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct Problem {
     #[serde(rename = "type")]
     pub ty: String,

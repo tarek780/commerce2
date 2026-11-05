@@ -25,7 +25,7 @@ pub struct TestEnv {
     pub state: Arc<AppState>,
 }
 
-pub async fn build_state() -> Option<TestEnv> {
+pub async fn build_state() -> TestEnv {
     //
     dotenvy::dotenv().ok();
     let pg_image = GenericImage::new("postgres", "16.15-alpine3.24")
@@ -63,7 +63,7 @@ pub async fn build_state() -> Option<TestEnv> {
     while attempts < max_attempts {
         match PgPoolOptions::new()
             .max_connections(5)
-            .acquire_timeout(std::time::Duration::from_secs(2)) 
+            .acquire_timeout(std::time::Duration::from_secs(2))
             .connect(&database_url)
             .await
         {
@@ -74,10 +74,11 @@ pub async fn build_state() -> Option<TestEnv> {
             Err(e) => {
                 attempts += 1;
                 let _ = stdout()
-                    .write_all(format!("⚠️ [step : {}/{}] {}\n", attempts, max_attempts, e).as_bytes())
+                    .write_all(
+                        format!("⚠️ [step : {}/{}] {}\n", attempts, max_attempts, e).as_bytes(),
+                    )
                     .await;
                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-
             }
         }
     }
@@ -133,7 +134,7 @@ pub async fn build_state() -> Option<TestEnv> {
     });
     let state = Arc::new(AppState { cart_service });
 
-    Some(TestEnv { state })
+    TestEnv { state }
 }
 
 pub async fn cleanup_redis(redis_url: &str, keys: &[&str]) {

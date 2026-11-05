@@ -16,18 +16,14 @@ use self::mocks::category::MockCategoryClient;
 use self::mocks::order::MockOrderClient;
 use self::mocks::payment::MockPaymentClient;
 
-use testcontainers::{
-    ContainerAsync,
-    core::{Image, ImageExt, IntoContainerPort, WaitFor},
-    runners::AsyncRunner,
-};
-use testcontainers::{ContainerRequest, GenericImage};
+use testcontainers::GenericImage;
+use testcontainers::{core::WaitFor, runners::AsyncRunner};
 use tokio::io::AsyncWriteExt;
 use tokio::io::stdout;
 
 pub async fn test_config() -> AppConfig {
     AppConfig {
-        http_addr: "127.0.0.1:0".into(),
+        http_addr: std::env::var("HTTP_ADDR").expect("VARERROR"),
         currency: "USD".into(),
         cart_base_url: "http://unused".into(),
         cart_clear_endpoint: "/api/cart".into(),
@@ -43,11 +39,7 @@ pub async fn test_config() -> AppConfig {
 }
 
 pub async fn run_redis_container() -> (ConnectionManager, String) {
-    unsafe {
-        std::env::set_var("SECRET_KEY", "test-secret-key-32-chars-minimum-xx");
-        std::env::set_var("RUST_LOG", "info");
-        std::env::set_var("RUST_BACKTRACE", "1");
-    }
+    dotenvy::dotenv().ok();
 
     let redis_image = GenericImage::new("redis", "alpine3.23")
         .with_wait_for(WaitFor::message_on_stdout("Ready to accept connections"));
@@ -69,7 +61,7 @@ pub async fn run_redis_container() -> (ConnectionManager, String) {
     };
     let redis_url = format!("redis://{redis_host}:{redis_port}");
 
-    let redis_client = redis::Client::open(redis_url).expect("redis client");
+    let redis_client = redis::Client::open(redis_url.clone()).expect("redis client");
     let redis = redis::aio::ConnectionManager::new(redis_client)
         .await
         .expect("redis conn manager");
@@ -85,7 +77,7 @@ pub struct TestHarness {
     pub idempotency: Arc<storefront_service::helpers::idempotency::MemoryIdempotencyStore>,
 }
 
-pub async fn harness() -> TestHarness {
+pub async fn harness() -> Arc<TestHarness> {
     auth::init_secret_once();
 
     let cart = Arc::new(MockCartClient::new());
@@ -105,14 +97,14 @@ pub async fn harness() -> TestHarness {
     );
 
     let app = storefront_service::routes::build(Arc::new(state));
-    TestHarness {
+    Arc::new(TestHarness {
         app,
         cart,
         category,
         order,
         payment,
         idempotency,
-    }
+    })
 }
 
 //  HTTP helpers

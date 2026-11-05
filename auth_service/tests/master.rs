@@ -1,0 +1,107 @@
+pub mod common;
+pub mod handler;
+//
+use crate::common::*;
+//
+#[tokio::test]
+async fn master() {
+    let ctx = TestContext::new().await;
+    let pool = ctx.pool.clone();
+    //
+    common::truncate_all(&pool).await;
+    //
+    handler::auth_delete::delete_user_removes_user_and_tokens(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    //
+    handler::auth_layer::accepts_valid_token_and_injects_user_id().await;
+    common::truncate_all(&pool).await;
+    handler::auth_layer::rejects_expired_token().await;
+    common::truncate_all(&pool).await;
+    handler::auth_layer::rejects_malformed_header().await;
+    common::truncate_all(&pool).await;
+    handler::auth_layer::rejects_missing_authorization().await;
+    common::truncate_all(&pool).await;
+    //
+    handler::auth_me::get_me_returns_current_user(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    handler::auth_me::get_me_with_expired_access_token_unauthorized(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    handler::auth_me::get_me_with_forged_token_unauthorized(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    handler::auth_me::get_me_with_malformed_bearer_unauthorized(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    handler::auth_me::get_me_without_token_unauthorized(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    handler::auth_me::update_me_display_name(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    handler::auth_me::update_me_empty_display_name_rejected(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    //
+    handler::auth_refresh_logout::logout_revokes_refresh(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    handler::auth_refresh_logout::refresh_invalid_token_unauthorized(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    handler::auth_refresh_logout::refresh_reuse_detects_theft_and_revokes_family(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    handler::auth_refresh_logout::refresh_rotates_token(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    //
+    handler::auth_register_login::login_success(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    handler::auth_register_login::login_unknown_email_unauthorized(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    handler::auth_register_login::login_wrong_password_unauthorized(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    handler::auth_register_login::register_duplicate_email_conflict(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    handler::auth_register_login::register_invalid_email_rejected(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    handler::auth_register_login::register_short_password_rejected(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    handler::auth_register_login::register_success_returns_tokens(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    //
+    handler::auth_verify_email::verify_email_rate_limit_blocks_second_issue(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    handler::auth_verify_email::verify_email_token_is_single_use(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    handler::auth_verify_email::verify_email_with_invalid_token_rejected(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    handler::auth_verify_email::verify_email_with_valid_token_marks_verified(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    //
+    handler::email_sending::register_still_succeeds_when_smtp_fails(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    //
+    handler::email_store::consume_removes_token(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    handler::email_store::issue_and_consume_roundtrip(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    handler::email_store::rate_limit_blocks_second_issue(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    handler::email_store::token_expires_after_ttl(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    //
+    handler::token_repo::delete_removes_tokens_for_user(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    handler::token_repo::insert_and_find_token(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    handler::token_repo::make_user(&pool).await;
+    common::truncate_all(&pool).await;
+    handler::token_repo::mark_rotated_sets_flag(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    handler::token_repo::revoke_family_revokes_all(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    //
+    handler::user_repo::create(&pool, "t@gmail.com").await;
+    common::truncate_all(&pool).await;
+    handler::user_repo::create_user_returns_full_row(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    handler::user_repo::delete_user_removes_row(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    handler::user_repo::duplicate_email_maps_to_conflict(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    handler::user_repo::find_by_id_and_update_display_name(ctx.clone()).await;
+    common::truncate_all(&pool).await;
+    handler::user_repo::mark_email_verified_sets_timestamp(ctx.clone()).await;
+}

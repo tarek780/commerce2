@@ -11,11 +11,9 @@ use crate::{middleware::auth::AuthLayer, state::AppState};
 pub fn build(state: Arc<AppState>) -> Router {
     let protected = Router::new()
         .route("/api/v1/checkout", post(checkout::checkout))
-        .route("/api/v1/orders", get(order::list_orders))
-        .route("/api/v1/orders/{id}", get(order::get_order))
-        .route("/api/v1/orders/{id}/cancel", post(order::cancel_order))
-        .route("/api/v1/orders/{id}/pay", post(order::pay_order))
-        .route("/api/v1/payments/{id}", get(payment::get_payment))
+        .route("/api/v1/orders/{id}", get(order::get))
+        .route("/api/v1/orders/{id}/cancel", post(order::cancel))
+        .route("/api/v1/orders/{id}/pay", post(order::pay))
         .layer(ServiceBuilder::new().layer(AuthLayer {}))
         .with_state(state.clone());
 

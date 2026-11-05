@@ -19,7 +19,7 @@ pub trait OrderClient: Send + Sync + 'static {
         &self,
         customer_id: &str,
         currency: &str,
-        items: Vec<(&str, i32, String)>,
+        items: Vec<(Uuid, i32, String)>,
         idempotency_key: &str,
     ) -> AppResult<OrderResponse>;
 
@@ -54,7 +54,7 @@ impl OrderClient for GrpcOrderClient {
         &self,
         customer_id: &str,
         currency: &str,
-        items: Vec<(&str, i32, String)>,
+        items: Vec<(Uuid, i32, String)>,
         idempotency_key: &str,
     ) -> AppResult<OrderResponse> {
         let mut c = self.inner.clone();

@@ -28,11 +28,7 @@ pub fn test_config(db_url: String, kafka_broker: String) -> PaymentConfig {
 }
 
 pub async fn test_state() -> Arc<AppState> {
-    unsafe {
-        std::env::set_var("SECRET_KEY", "test-secret-key-32-chars-minimum-xx");
-        std::env::set_var("RUST_LOG", "info");
-        std::env::set_var("RUST_BACKTRACE", "1");
-    }
+    dotenvy::dotenv().ok();
 
     let pg_image = GenericImage::new("postgres", "16.15-alpine3.24")
         .with_wait_for(WaitFor::message_on_stdout(

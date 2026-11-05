@@ -8,6 +8,15 @@ use crate::middleware::user::CurrentUser;
 use crate::state::AppState;
 
 /// GET /api/v1/payments/:id
+#[utoipa::path(
+    get,
+    path = "/api/v1/payments/{:id}",
+    
+    responses(
+        (status = 200, description = "Success"
+        )
+    )
+)]
 pub async fn get(
     State(state): State<Arc<AppState>>,
     CurrentUser(_user_id): CurrentUser,

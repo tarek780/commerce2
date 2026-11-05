@@ -1,9 +1,8 @@
 use serde::Deserialize;
 use utoipa::IntoParams;
-
-#[derive(Debug, Deserialize, IntoParams)]
+use utoipa::ToSchema;
+#[derive(Debug, Deserialize, IntoParams, ToSchema)]
 pub struct PageParams {
-
     pub first: Option<i32>,
 
     pub after: Option<String>,

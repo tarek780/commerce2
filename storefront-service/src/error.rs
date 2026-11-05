@@ -1,6 +1,7 @@
 use crate::problem::Problem;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
+use uuid::Uuid;
 
 pub type AppResult<T> = Result<T, AppError>;
 
@@ -28,7 +29,7 @@ pub enum AppError {
         "Insufficient stock, variant {variant_id}: requested {requested}, available {available}"
     )]
     InsufficientStock {
-        variant_id: i64,
+        variant_id: i32,
         requested: i32,
         available: i32,
     },
@@ -104,9 +105,7 @@ impl IntoResponse for AppError {
             AppError::InvalidHeader(err) => {
                 (StatusCode::BAD_REQUEST, "invalid-header", err.to_string())
             }
-            AppError::JsonToken(err) => {
-                (StatusCode::BAD_REQUEST, "invalid-token", err.to_string())
-            }
+            AppError::JsonToken(err) => (StatusCode::BAD_REQUEST, "invalid-token", err.to_string()),
 
             AppError::InsufficientStock { .. } => (
                 StatusCode::PAYMENT_REQUIRED,
@@ -123,7 +122,6 @@ impl IntoResponse for AppError {
 
             AppError::Config(_)
             | AppError::Internal(_)
-           
             | AppError::Uuid(_)
             | AppError::VarError(_)
             | AppError::Redis(_)

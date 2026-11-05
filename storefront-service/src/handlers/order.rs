@@ -1,34 +1,30 @@
 use axum::{
     Json,
-    extract::{Extension, Path, Query, State},
-    response::IntoResponse,
+    extract::{ Path, State},
+    
 };
 // Extension(auth): Extension<AccessToken>,
 use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::clients::order::pb_order::OrderResponse;
-use crate::dto::order::{
-    CancelOrderBody, OrderConnection, OrderDto, OrderEdge, PageInfoDto, PayOrderResponse,
-};
-use crate::dto::pagination::PageParams;
-use crate::error::{AppError, AppResult};
-use crate::middleware::auth::AccessToken;
+use crate::dto::order::{CancelOrderBody, OrderDto, PayOrderResponse};
+use crate::error::{AppError};
 use crate::middleware::user::CurrentUser;
 use crate::state::AppState;
 
 //
-pub async fn get_order(
-    State(state): State<Arc<AppState>>,
-    Extension(auth): Extension<AccessToken>,
-    Path(order_id): Path<String>,
-) -> AppResult<impl IntoResponse> {
-    let order = state.order.get_order(&order_id).await?;
-    if order.customer_id != auth.user_id {
-        return Err(AppError::NotFound("order not found".into()));
-    }
-    Ok(Json(to_dto(order)))
-}
+// pub async fn get_order(
+//     State(state): State<Arc<AppState>>,
+//     Extension(auth): Extension<AccessToken>,
+//     Path(order_id): Path<String>,
+// ) -> AppResult<impl IntoResponse> {
+//     let order = state.order.get_order(&order_id).await?;
+//     if order.customer_id != auth.user_id {
+//         return Err(AppError::NotFound("order not found".into()));
+//     }
+//     Ok(Json(to_dto(order)))
+// }
 //
 /// GET /api/v1/orders
 
@@ -63,6 +59,15 @@ pub async fn get_order(
 // }
 
 /// GET /api/v1/orders/:id
+#[utoipa::path(
+    get,
+    path = "/api/v1/orders/{:id}",
+    
+    responses(
+        (status = 200, description = "Success"
+        )
+    )
+)]
 pub async fn get(
     State(state): State<Arc<AppState>>,
     CurrentUser(user_id): CurrentUser,
@@ -77,6 +82,15 @@ pub async fn get(
 }
 
 /// POST /api/v1/orders/:id/cancel
+#[utoipa::path(
+    post,
+    path = "/api/v1/orders/{:id}/cancel",
+    
+    responses(
+        (status = 200, description = "Success"
+        )
+    )
+)]
 pub async fn cancel(
     State(state): State<Arc<AppState>>,
     CurrentUser(user_id): CurrentUser,
@@ -93,6 +107,15 @@ pub async fn cancel(
 }
 
 /// POST /api/v1/orders/:id/pay
+#[utoipa::path(
+    post,
+    path = "/api/v1/orders/{:id}/pay",
+    
+    responses(
+        (status = 200, description = "Success"
+        )
+    )
+)]
 pub async fn pay(
     State(state): State<Arc<AppState>>,
     CurrentUser(user_id): CurrentUser,

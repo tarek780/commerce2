@@ -24,6 +24,7 @@ COPY src ./src
 
 RUN --mount=type=cache,id=storefront_service-cargo-registry,target=/usr/local/cargo/registry \
     --mount=type=cache,id=storefront_service-cargo-target-deps,target=/usr/src/app/target/release/deps \
+    cargo run && \
     cargo test --release && \
     cargo build --release && \
     cp target/release/storefront_service /usr/local/bin/storefront_service

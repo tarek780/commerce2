@@ -24,6 +24,8 @@ COPY src ./src
 
 RUN --mount=type=cache,id=inventory_servise-cargo-registry,target=/usr/local/cargo/registry \
     --mount=type=cache,id=inventory_servise-cargo-target-deps,target=/usr/src/app/target/release/deps \
+    
+    cargo run && \
     cargo test --release && \
     cargo build --release && \
     cp target/release/inventory_servise /usr/local/bin/inventory_servise

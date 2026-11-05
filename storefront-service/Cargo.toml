@@ -44,7 +44,7 @@ async-trait = "0.1"
 base64 = "0.22"
 
 tower = { version = "0.5", features = ["util"] }
-jsonwebtoken = "11.1.0"
+jsonwebtoken = { version = "11.1.0", default-features = false, features = ["rust_crypto"] }
 futures-util = "0.3.34"
 
 [build-dependencies]

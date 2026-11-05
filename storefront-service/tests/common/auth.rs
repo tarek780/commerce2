@@ -14,7 +14,7 @@ pub fn secret() -> &'static str {
 }
 
 pub fn access_token_for(user_id: &str) -> String {
-    token_with(user_id, "Access", "User", 3600)
+    token_with(user_id, "Access", "User", 99999999999999999)
 }
 
 pub fn refresh_token_for(user_id: &str) -> String {

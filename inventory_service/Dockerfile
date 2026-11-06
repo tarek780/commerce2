@@ -22,13 +22,12 @@ COPY proto ./proto
 COPY src ./src
 
 
-RUN --mount=type=cache,id=inventory_servise-cargo-registry,target=/usr/local/cargo/registry \
-    --mount=type=cache,id=inventory_servise-cargo-target-deps,target=/usr/src/app/target/release/deps \
+RUN --mount=type=cache,id=inventory_service-cargo-registry,target=/usr/local/cargo/registry \
+    --mount=type=cache,id=inventory_service-cargo-target-deps,target=/usr/src/app/target/release/deps \
     
-    cargo run && \
     cargo test --release && \
     cargo build --release && \
-    cp target/release/inventory_servise /usr/local/bin/inventory_servise
+    cp target/release/inventory_service /usr/local/bin/inventory_service
 
 
 FROM debian:trixie-slim
@@ -39,6 +38,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 
-COPY --from=builder /usr/local/bin/inventory_servise /usr/local/bin/inventory_servise
+COPY --from=builder /usr/local/bin/inventory_service /usr/local/bin/inventory_service
 
-CMD ["inventory_servise"]
+CMD ["inventory_service"]

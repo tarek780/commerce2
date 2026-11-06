@@ -1,22 +1,25 @@
 use order_service::state::AppState;
 use sqlx::{PgPool, postgres::PgPoolOptions};
 use std::sync::Arc;
+use testcontainers::ContainerAsync;
 use testcontainers::GenericImage;
 use testcontainers::{
     core::{ImageExt, WaitFor},
     runners::AsyncRunner,
 };
-
+use tokio::io::AsyncWriteExt;
+use tokio::io::stdout;
 pub struct TestAppState {
     pub pool: PgPool,
     pub appstate: Arc<AppState>,
     pub database_url: String,
     pub kafka_brokers: String,
+    pub pg_container: ContainerAsync<GenericImage>,
+    pub kafka_container: ContainerAsync<GenericImage>,
 }
 
 pub async fn setup_test_state() -> Arc<TestAppState> {
     dotenvy::dotenv().ok();
-    // pg 16.15-alpine3.24 is the latest version as of 2024-06-05
     let pg_image = GenericImage::new("postgres", "16.15-alpine3.24")
         .with_wait_for(WaitFor::message_on_stdout(
             "database system is ready to accept connections",
@@ -25,24 +28,63 @@ pub async fn setup_test_state() -> Arc<TestAppState> {
         .with_env_var("POSTGRES_PASSWORD", "mypassword")
         .with_env_var("POSTGRES_DB", "mydb");
 
-    let pg_container = pg_image
+    let pg_container: ContainerAsync<GenericImage> = pg_image
         .start()
         .await
         .expect("Failed to start Postgres container");
 
-    let pg_port = pg_container
-        .get_host_port_ipv4(5432)
-        .await
-        .expect("Failed to get Postgres container port");
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
+    let pg_port = match pg_container.get_host_port_ipv4(5432).await {
+        Ok(c) => c,
+        Err(e) => {
+            let _ = stdout()
+                .write_all(format!("Failed to get Postgres container port: {}\n", e).as_bytes())
+                .await;
+            panic!("Failed to get Postgres container port: {}", e);
+        }
+    };
 
     let database_url =
         format!("postgres://myuser:mypassword@127.0.0.1:{pg_port}/mydb?sslmode=disable");
 
-    let pool = PgPoolOptions::new()
-        .max_connections(5)
-        .connect(&database_url)
-        .await
-        .expect("connect test postgres");
+    let mut pool_option: Option<PgPool> = None;
+    let mut attempts = 0;
+    let max_attempts = 7;
+
+    while attempts < max_attempts {
+        match PgPoolOptions::new()
+            .max_connections(5)
+            .acquire_timeout(std::time::Duration::from_secs(2))
+            .connect(&database_url)
+            .await
+        {
+            Ok(p) => {
+                pool_option = Some(p);
+                break;
+            }
+            Err(e) => {
+                attempts += 1;
+                let _ = stdout()
+                    .write_all(
+                        format!(
+                            "[ step {}/{}] the error : 500 : {}\n",
+                            attempts, max_attempts, e
+                        )
+                        .as_bytes(),
+                    )
+                    .await;
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            }
+        }
+    }
+
+    let pool = pool_option.unwrap_or_else(|| {
+        panic!(
+            "Failed to connect to Postgres after {} attempts",
+            max_attempts
+        );
+    });
 
     sqlx::migrate!("./migrations")
         .run(&pool)
@@ -76,6 +118,8 @@ pub async fn setup_test_state() -> Arc<TestAppState> {
         database_url,
         kafka_brokers,
         appstate,
+        kafka_container,
+        pg_container,
     })
 }
 

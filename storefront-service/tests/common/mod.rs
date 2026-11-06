@@ -40,7 +40,7 @@ pub async fn test_config() -> AppConfig {
     }
 }
 
-pub async fn run_redis_container() -> (ConnectionManager, String) {
+pub async fn run_redis_container() -> (ConnectionManager, String ,  ContainerAsync<GenericImage>) {
     dotenvy::dotenv().ok();
 
     let redis_image = GenericImage::new("redis", "alpine3.23")
@@ -67,7 +67,7 @@ pub async fn run_redis_container() -> (ConnectionManager, String) {
     let redis = redis::aio::ConnectionManager::new(redis_client)
         .await
         .expect("redis conn manager");
-    (redis, redis_url)
+    (redis, redis_url ,redis_container )
 }
 
 pub struct TestHarness {

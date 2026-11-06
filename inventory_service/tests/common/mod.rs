@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-
+mod rs;
 use std::sync::Arc;
 
 use inventory_service::inventory::repo::InventoryRepo;
@@ -9,6 +9,7 @@ use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
 use tokio::sync::broadcast;
 
+use testcontainers::ContainerAsync;
 use testcontainers::GenericImage;
 use testcontainers::{
     core::{ImageExt, WaitFor},
@@ -19,6 +20,7 @@ use tokio::io::stdout;
 use uuid::Uuid;
 
 pub struct TestEnv {
+    pub pg_container: ContainerAsync<GenericImage>,
     pub pool: PgPool,
     pub repo: Arc<InventoryRepo>,
     pub stock_tx: broadcast::Sender<StockUpdate>,
@@ -36,12 +38,12 @@ pub async fn build_env() -> Arc<TestEnv> {
         .with_env_var("POSTGRES_PASSWORD", "mypassword")
         .with_env_var("POSTGRES_DB", "mydb");
 
-    let pg_container = pg_image
+    let pg_container: testcontainers::ContainerAsync<GenericImage> = pg_image
         .start()
         .await
         .expect("Failed to start Postgres container");
 
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
     let pg_port = match pg_container.get_host_port_ipv4(5432).await {
         Ok(c) => c,
@@ -56,13 +58,43 @@ pub async fn build_env() -> Arc<TestEnv> {
     let database_url =
         format!("postgres://myuser:mypassword@127.0.0.1:{pg_port}/mydb?sslmode=disable");
 
-    // let database_url = format!("postgres://myuser:mypassword@127.0.0.1:5433/mydb?sslmode=disable");
+    let mut pool_option: Option<PgPool> = None;
+    let mut attempts = 0;
+    let max_attempts = 7;
 
-    let pool = PgPoolOptions::new()
-        .max_connections(5)
-        .connect(&database_url)
-        .await
-        .expect("connect test postgres");
+    while attempts < max_attempts {
+        match PgPoolOptions::new()
+            .max_connections(5)
+            .acquire_timeout(std::time::Duration::from_secs(2))
+            .connect(&database_url)
+            .await
+        {
+            Ok(p) => {
+                pool_option = Some(p);
+                break;
+            }
+            Err(e) => {
+                attempts += 1;
+                let _ = stdout()
+                    .write_all(
+                        format!(
+                            "[ step {}/{}] the error : 500 : {}\n",
+                            attempts, max_attempts, e
+                        )
+                        .as_bytes(),
+                    )
+                    .await;
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            }
+        }
+    }
+
+    let pool = pool_option.unwrap_or_else(|| {
+        panic!(
+            "Failed to connect to Postgres after {} attempts",
+            max_attempts
+        );
+    });
 
     sqlx::migrate!("./migrations")
         .run(&pool)
@@ -74,6 +106,7 @@ pub async fn build_env() -> Arc<TestEnv> {
     let svc = InventorySvc::new(repo.clone(), stock_tx.clone());
 
     Arc::new(TestEnv {
+        pg_container,
         pool,
         repo,
         stock_tx,

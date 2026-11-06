@@ -13,6 +13,9 @@ use cart_service::cart::service::CartService;
 use cart_service::state::AppState;
 use sqlx::PgPool;
 
+use testcontainers::ContainerAsync;
+use testcontainers::GenericImage;
+
 use sqlx::postgres::PgPoolOptions;
 use testcontainers::GenericImage;
 use testcontainers::{
@@ -23,6 +26,8 @@ use tokio::io::AsyncWriteExt;
 
 pub struct TestEnv {
     pub state: Arc<AppState>,
+    pub pg_container: ContainerAsync<GenericImage>,
+    pub redis_container: ContainerAsync<GenericImage>,
 }
 
 pub async fn build_state() -> Arc<TestEnv> {
@@ -134,7 +139,7 @@ pub async fn build_state() -> Arc<TestEnv> {
     });
     let state = Arc::new(AppState { cart_service });
 
-    Arc::new(TestEnv { state })
+    Arc::new(TestEnv { state , redis_container , pg_container })
 }
 
 pub async fn cleanup_redis(redis_url: &str, keys: &[&str]) {

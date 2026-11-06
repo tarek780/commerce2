@@ -17,7 +17,7 @@ use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderName, HeaderValue};
 use std::str::FromStr;
 use storefront_service::config::AppConfig;
 use storefront_service::state::AppState;
-
+use testcontainers::ContainerAsync;
 use testcontainers::GenericImage;
 use testcontainers::{core::WaitFor, runners::AsyncRunner};
 use tokio::io::AsyncWriteExt;
@@ -40,7 +40,7 @@ pub async fn test_config() -> AppConfig {
     }
 }
 
-pub async fn run_redis_container() -> (ConnectionManager, String ,  ContainerAsync<GenericImage>) {
+pub async fn run_redis_container() -> (ConnectionManager, String, ContainerAsync<GenericImage>) {
     dotenvy::dotenv().ok();
 
     let redis_image = GenericImage::new("redis", "alpine3.23")
@@ -67,7 +67,7 @@ pub async fn run_redis_container() -> (ConnectionManager, String ,  ContainerAsy
     let redis = redis::aio::ConnectionManager::new(redis_client)
         .await
         .expect("redis conn manager");
-    (redis, redis_url ,redis_container )
+    (redis, redis_url, redis_container)
 }
 
 pub struct TestHarness {

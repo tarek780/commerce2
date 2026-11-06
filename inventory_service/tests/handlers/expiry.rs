@@ -1,6 +1,6 @@
 use crate::common::*;
 use inventory_service::inventory::expiry::expire_batch;
-use std::sync::Arc;
+use std::{f32::consts::E, sync::Arc};
 use uuid::Uuid;
 
 pub async fn expiry_worker_releases_and_emits_event(env: Arc<TestEnv>) {
@@ -8,11 +8,12 @@ pub async fn expiry_worker_releases_and_emits_event(env: Arc<TestEnv>) {
 
     seed_inventory(&env.pool, vid, 5).await;
 
-    let res = env
-        .repo
-        .reserve(&new_reservation_key(), vid, 2, -10)
-        .await
-        .unwrap();
+    let res = match env.repo.reserve(&new_reservation_key(), vid, 2, -10).await {
+        Ok(x) => x,
+        Err(e) => {
+            panic!(" err : {e}");
+        }
+    };
 
     let mut rx = env.stock_tx.subscribe();
 
@@ -23,11 +24,16 @@ pub async fn expiry_worker_releases_and_emits_event(env: Arc<TestEnv>) {
     assert_eq!(stock, 5);
     assert_eq!(reserved, 0);
 
-    let status: (String,) = sqlx::query_as("SELECT status FROM reservations WHERE id = $1")
+    let status: (String,) = match sqlx::query_as("SELECT status FROM reservations WHERE id = $1")
         .bind(res.id)
         .fetch_one(&env.pool)
         .await
-        .unwrap();
+    {
+        Ok(x) => x,
+        Err(e) => {
+            panic!(" err : {e}");
+        }
+    };
     assert_eq!(status.0, "released");
 
     let mut got = false;

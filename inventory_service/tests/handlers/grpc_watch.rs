@@ -50,7 +50,7 @@ pub async fn watch_receives_reserved_event(env: Arc<TestEnv>) {
 
     tokio::time::sleep(Duration::from_millis(100)).await;
 
-    let _ = client
+    let _ = match client
         .reserve(ReserveRequest {
             reservation_key: new_reservation_key(),
             variant_id: vid.to_string(),
@@ -58,7 +58,12 @@ pub async fn watch_receives_reserved_event(env: Arc<TestEnv>) {
             ttl_seconds: 60,
         })
         .await
-        .unwrap();
+    {
+        Ok(x) => x,
+        Err(e) => {
+            panic!(" err : {e}");
+        }
+    };
 
     let ev = tokio::time::timeout(Duration::from_secs(2), stream.message())
         .await

@@ -32,55 +32,69 @@ impl InventoryRepo {
         let new_id = Uuid::now_v7();
         let expires_at = Utc::now() + Duration::seconds(ttl_seconds);
 
-        let inserted: Option<(Uuid,)> = sqlx::query_as(
-            r#"INSERT INTO reservations (id, reservation_key, variant_id, quantity, status, expires_at)
-               VALUES ($1, $2, $3, $4, 'pending', $5)
-               ON CONFLICT (reservation_key) DO NOTHING
-               RETURNING id"#,
-        )
-        .bind(new_id).bind(reservation_key).bind(variant_id)
-        .bind(quantity).bind(expires_at)
-        .fetch_optional(&mut *tx).await?;
+        let reservation_id = match sqlx::query_as::<_, (uuid::Uuid,)>(
+        r#"INSERT INTO reservations (id, reservation_key, variant_id, quantity, status, expires_at)
+           VALUES ($1, $2, $3, $4, 'pending', $5)
+           ON CONFLICT (reservation_key) DO NOTHING
+           RETURNING id"#,
+    )
+    .bind(new_id)
+    .bind(reservation_key)
+    .bind(variant_id)
+    .bind(quantity)
+    .bind(expires_at)
+    .fetch_optional(&mut *tx).await {
+        Ok(Some(row)) => row.0, 
+        Ok(None) => {
+            let existing: Option<(Uuid, Uuid, i32)> = sqlx::query_as(
+                "SELECT id, variant_id, quantity FROM reservations WHERE reservation_key = $1",
+            ).bind(reservation_key).fetch_optional(&mut *tx).await?;
 
-        let reservation_id = match inserted {
-            Some((id,)) => {
-                let row: Option<(i32, i32)> = sqlx::query_as(
-                    "SELECT stock_quantity, reserved_quantity FROM inventory WHERE variant_id = $1 FOR UPDATE",
-                ).bind(variant_id).fetch_optional(&mut *tx).await?;
-
-                let (stock, reserved) = row.ok_or(InventoryError::VariantNotFound)?;
-                let available = stock - reserved;
-                if available < quantity {
-                    return Err(InventoryError::InsufficientStock { available });
-                }
-
-                sqlx::query("UPDATE inventory SET reserved_quantity = reserved_quantity + $1, updated_at = now() WHERE variant_id = $2")
-                    .bind(quantity).bind(variant_id).execute(&mut *tx).await?;
-
-                sqlx::query("INSERT INTO inventory_logs (sku, change_amount, type, reference_id) VALUES ($1, $2, 'reserve', $3)")
-                    .bind(variant_id.to_string()).bind(-quantity).bind(reservation_key)
-                    .execute(&mut *tx).await?;
-
-                sqlx::query("INSERT INTO outbox_events (id, aggregate_type, aggregate_id, event_type, payload) VALUES ($1, 'inventory', $2, 'reserved', $3)")
-                    .bind(Uuid::now_v7()).bind(variant_id)
-                    .bind(serde_json::json!({"reservation_id": new_id, "variant_id": variant_id, "quantity": quantity}))
-                    .execute(&mut *tx).await?;
-
-                id
+            let (id, vid, qty) = existing.ok_or(InventoryError::ReservationNotFound)?;
+            if vid != variant_id || qty != quantity {
+                return Err(InventoryError::IdempotencyMismatch); 
             }
-            None => {
-                let existing: Option<(Uuid, Uuid, i32)> = sqlx::query_as(
-                    "SELECT id, variant_id, quantity FROM reservations WHERE reservation_key = $1 AND status = 'pending'",
-                ).bind(reservation_key).fetch_optional(&mut *tx).await?;
-                let (id, vid, qty) = existing.ok_or(InventoryError::ReservationNotFound)?;
-                if vid != variant_id || qty != quantity {
-                    return Err(InventoryError::IdempotencyMismatch);
+            id
+        }
+        Err(e) => {
+            if let sqlx::Error::Database(ref db_err) = e {
+                if db_err.code() == Some("23503".into()) {
+                    return Err(InventoryError::VariantNotFound); 
                 }
-                id
             }
-        };
+            return Err(InventoryError::Database(e));
+        }
+    };
+
+        let row: Option<(i32, i32)> = sqlx::query_as(
+        "SELECT stock_quantity, reserved_quantity FROM inventory WHERE variant_id = $1 FOR UPDATE",
+    ).bind(variant_id).fetch_optional(&mut *tx).await?;
+
+        let (stock, reserved) = row.ok_or(InventoryError::VariantNotFound)?;
+        let available = stock - reserved;
+
+        if available < quantity {
+            return Err(InventoryError::InsufficientStock { available });
+        }
+
+        sqlx::query("UPDATE inventory SET reserved_quantity = reserved_quantity + $1, updated_at = now() WHERE variant_id = $2")
+        .bind(quantity).bind(variant_id).execute(&mut *tx).await?;
+
+        sqlx::query("INSERT INTO inventory_logs (id, sku, change_amount, type, reference_id) VALUES ($1, $2, $3, 'reserve', $4)")
+        .bind(Uuid::now_v7())
+        .bind(variant_id) 
+        .bind(-quantity)
+        .bind(reservation_key)
+        .execute(&mut *tx).await?;
+
+        sqlx::query("INSERT INTO outbox_events (id, aggregate_type, aggregate_id, event_type, payload) VALUES ($1, 'inventory', $2, 'reserved', $3)")
+        .bind(Uuid::now_v7()) 
+        .bind(variant_id)
+        .bind(serde_json::json!({"reservation_id": reservation_id, "variant_id": variant_id, "quantity": quantity}))
+        .execute(&mut *tx).await?;
 
         tx.commit().await?;
+
         Ok(Reservation {
             id: reservation_id,
             variant_id,
@@ -91,7 +105,7 @@ impl InventoryRepo {
 
     pub async fn release(&self, reservation_id: Uuid) -> Result<(), InventoryError> {
         let mut tx = self.pool.begin().await?;
-        let row: Option<(i32, i32, String)> = sqlx::query_as(
+        let row: Option<(Uuid, i32, String)> = sqlx::query_as(
             "SELECT variant_id, quantity, status FROM reservations WHERE id = $1 FOR UPDATE",
         )
         .bind(reservation_id)
@@ -104,12 +118,17 @@ impl InventoryRepo {
 
         sqlx::query("UPDATE inventory SET reserved_quantity = reserved_quantity - $1, updated_at = now() WHERE variant_id = $2")
             .bind(quantity).bind(variant_id).execute(&mut *tx).await?;
+
         sqlx::query("UPDATE reservations SET status = 'released' WHERE id = $1")
             .bind(reservation_id)
             .execute(&mut *tx)
             .await?;
-        sqlx::query("INSERT INTO inventory_logs (sku, change_amount, type, reference_id) VALUES ($1, $2, 'release', $3)")
-            .bind(variant_id.to_string()).bind(quantity).bind(reservation_id.to_string())
+
+        sqlx::query("INSERT INTO inventory_logs (id, sku, change_amount, type, reference_id) VALUES ($1, $2, $3, 'release', $4)")
+            .bind(Uuid::now_v7())
+            .bind(variant_id.to_string())
+            .bind(quantity)
+            .bind(reservation_id.to_string())
             .execute(&mut *tx).await?;
 
         tx.commit().await?;
@@ -118,7 +137,7 @@ impl InventoryRepo {
 
     pub async fn commit(&self, reservation_id: Uuid) -> Result<(), InventoryError> {
         let mut tx = self.pool.begin().await?;
-        let row: Option<(i32, i32, String, chrono::DateTime<Utc>)> = sqlx::query_as(
+        let row: Option<(Uuid, i32, String, chrono::DateTime<Utc>)> = sqlx::query_as(
             "SELECT variant_id, quantity, status, expires_at FROM reservations WHERE id = $1 FOR UPDATE",
         ).bind(reservation_id).fetch_optional(&mut *tx).await?;
         let (variant_id, quantity, status, expires_at) =
@@ -132,12 +151,17 @@ impl InventoryRepo {
 
         sqlx::query("UPDATE inventory SET stock_quantity = stock_quantity - $1, reserved_quantity = reserved_quantity - $1, updated_at = now() WHERE variant_id = $2")
             .bind(quantity).bind(variant_id).execute(&mut *tx).await?;
+
         sqlx::query("UPDATE reservations SET status = 'committed' WHERE id = $1")
             .bind(reservation_id)
             .execute(&mut *tx)
             .await?;
-        sqlx::query("INSERT INTO inventory_logs (sku, change_amount, type, reference_id) VALUES ($1, $2, 'commit', $3)")
-            .bind(variant_id.to_string()).bind(-quantity).bind(reservation_id.to_string())
+
+        sqlx::query("INSERT INTO inventory_logs (id, sku, change_amount, type, reference_id) VALUES ($1, $2, $3, 'commit', $4)")
+            .bind(Uuid::now_v7())
+            .bind(variant_id)
+            .bind(-quantity)
+            .bind(reservation_id.to_string())
             .execute(&mut *tx).await?;
 
         tx.commit().await?;
@@ -181,9 +205,14 @@ impl InventoryRepo {
         .bind(variant_id)
         .execute(&mut *tx)
         .await?;
-        sqlx::query("INSERT INTO inventory_logs (sku, change_amount, type, reference_id) VALUES ($1, $2, 'adjust', $3)")
-            .bind(variant_id.to_string()).bind(delta).bind(reference_id)
-            .execute(&mut *tx).await?;
+
+        sqlx::query("INSERT INTO inventory_logs (id, sku, change_amount, type, reference_id) VALUES ($1, $2, $3, 'adjust', $4)")
+            .bind(Uuid::now_v7())
+            .bind(variant_id)
+            .bind(delta)
+            .bind(reference_id)
+            .execute(&mut *tx)
+            .await?;
 
         tx.commit().await?;
         Ok(new_stock)

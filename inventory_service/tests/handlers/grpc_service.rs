@@ -19,8 +19,12 @@ async fn spawn_server(env: &TestEnv) -> (Channel, tokio::task::JoinHandle<()>) {
     let svc = InventorySvc::new(repo, tx);
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let addr = listener.local_addr().unwrap();
-
+    let addr = match listener.local_addr() {
+        Ok(x) => x,
+        Err(e) => {
+            panic!(" err : {e}");
+        }
+    };
     let server = Server::builder()
         .add_service(InventoryServiceServer::new(svc))
         .serve_with_incoming(tokio_stream::wrappers::TcpListenerStream::new(listener));

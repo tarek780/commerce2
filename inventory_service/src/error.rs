@@ -2,6 +2,8 @@ use tonic::Status;
 
 #[derive(Debug, thiserror::Error)]
 pub enum InventoryError {
+    #[error("database: {0}")]
+    Database(#[from] sqlx::Error),
     #[error("variant not found")]
     VariantNotFound,
     #[error("reservation not found")]
@@ -16,8 +18,9 @@ pub enum InventoryError {
     ReservationExpired,
     #[error("invalid state: {0}")]
     InvalidState(String),
-    #[error("database: {0}")]
-    Database(#[from] sqlx::Error),
+
+    #[error("uuid: {0}")]
+    UUID(#[from] uuid::Error),
 }
 
 impl From<InventoryError> for Status {
@@ -44,6 +47,8 @@ impl From<InventoryError> for Status {
                 tracing::error!(?e, "database error");
                 Status::internal("database error")
             }
+
+            InventoryError::UUID(e) => Status::internal("uuid error"),
         }
     }
 }

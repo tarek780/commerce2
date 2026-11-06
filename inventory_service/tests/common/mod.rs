@@ -53,8 +53,13 @@ pub async fn build_env() -> Arc<TestEnv> {
         }
     };
 
-    let database_url =
-        format!("postgres://myuser:mypassword@127.0.0.1:{pg_port}/mydb?sslmode=disable");
+    // let database_url =
+    //     format!("postgres://myuser:mypassword@127.0.0.1:{pg_port}/mydb?sslmode=disable");
+
+    let database_url = format!(
+        "postgres://myuser:mypassword@127.0.0.1:5433/mydb?sslmode=disable
+"
+    );
 
     let pool = PgPoolOptions::new()
         .max_connections(5)
@@ -108,11 +113,12 @@ pub fn new_variant_id() -> i32 {
 
 pub async fn seed_inventory(pool: &PgPool, variant_id: Uuid, stock: i32) {
     sqlx::query(
-        r#"INSERT INTO inventory (variant_id, stock_quantity, reserved_quantity)
-           VALUES ($1, $2, 0)
+        r#"INSERT INTO inventory (id ,variant_id, stock_quantity, reserved_quantity)
+           VALUES ($1, $2, $3, 0)
            ON CONFLICT (variant_id) DO UPDATE
            SET stock_quantity = EXCLUDED.stock_quantity, reserved_quantity = 0"#,
     )
+    .bind(Uuid::now_v7())
     .bind(variant_id)
     .bind(stock)
     .execute(pool)
@@ -136,5 +142,5 @@ pub async fn cleanup_variant(pool: &PgPool, variant_id: Uuid) {
 }
 
 pub fn new_reservation_key() -> String {
-    format!("test-res-{}", uuid::Uuid::now_v7())
+    uuid::Uuid::now_v7().to_string()
 }

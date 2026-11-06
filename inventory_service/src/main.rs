@@ -13,7 +13,7 @@ use std::time::Duration;
 use sqlx::postgres::PgPoolOptions;
 use tokio::sync::broadcast;
 use tonic::transport::Server;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::inventory::repo::InventoryRepo;
 use crate::inventory::service::InventorySvc;
@@ -38,7 +38,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .connect(&database_url)
         .await?;
 
-    sqlx::migrate!("./migrations").run(&pool).await?;
+    sqlx::migrate!("./migrations")
+        .set_ignore_missing(true)
+        .run(&pool)
+        .await?;
     tracing::info!("migrations applied");
 
     let (stock_tx, _) = broadcast::channel(1024);

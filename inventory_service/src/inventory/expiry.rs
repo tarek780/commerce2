@@ -25,9 +25,14 @@ pub async fn expire_batch(
             .bind(id)
             .execute(&mut *db_tx)
             .await?;
-        sqlx::query("INSERT INTO inventory_logs (sku, change_amount, type, reference_id) VALUES ($1, $2, 'expire', $3)")
-            .bind(variant_id.to_string()).bind(qty).bind(id.to_string())
-            .execute(&mut *db_tx).await?;
+
+        sqlx::query("INSERT INTO inventory_logs (id, sku, change_amount, type, reference_id) VALUES ($1, $2, $3, 'expire', $4)")
+    
+    
+    
+    .bind(uuid::Uuid::now_v7()) 
+    .bind(variant_id.to_string()).bind(qty).bind(id.to_string())
+    .execute(&mut *db_tx).await?;
 
         let _ = tx.send(StockUpdate {
             variant_id: variant_id.to_string(),

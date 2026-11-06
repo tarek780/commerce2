@@ -53,13 +53,10 @@ pub async fn build_env() -> Arc<TestEnv> {
         }
     };
 
-    // let database_url =
-    //     format!("postgres://myuser:mypassword@127.0.0.1:{pg_port}/mydb?sslmode=disable");
+    let database_url =
+        format!("postgres://myuser:mypassword@127.0.0.1:{pg_port}/mydb?sslmode=disable");
 
-    let database_url = format!(
-        "postgres://myuser:mypassword@127.0.0.1:5433/mydb?sslmode=disable
-"
-    );
+    // let database_url = format!("postgres://myuser:mypassword@127.0.0.1:5433/mydb?sslmode=disable");
 
     let pool = PgPoolOptions::new()
         .max_connections(5)

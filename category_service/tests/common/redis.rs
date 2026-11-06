@@ -1,17 +1,15 @@
+use std::sync::Arc;
+
 use redis::Client;
 use redis::aio::{ConnectionManager, MultiplexedConnection};
 
+use crate::common::TestStateRD;
 use testcontainers::{ContainerAsync, GenericImage};
 use testcontainers::{core::WaitFor, runners::AsyncRunner};
 use tokio::io::AsyncWriteExt;
 use tokio::io::stdout;
 
-pub async fn setup() -> (
-    Client,
-    ConnectionManager,
-    MultiplexedConnection,
-    ContainerAsync<GenericImage>,
-) {
+pub async fn setup() -> Arc<TestStateRD> {
     dotenvy::dotenv().ok();
 
     let redis_image = GenericImage::new("redis", "alpine3.23")
@@ -40,7 +38,10 @@ pub async fn setup() -> (
         .await
         .expect("redis connection");
     let redis_manager = ConnectionManager::new(redis_client.clone()).await.unwrap();
-    (redis_client, redis_manager, redis, redis_container)
+    Arc::new(TestStateRD {
+        redis_container,
+        redis_manager,
+    })
     //
 }
 

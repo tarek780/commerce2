@@ -4,8 +4,10 @@ pub mod handlers;
 //
 #[tokio::test]
 async fn master() {
-    let pool = common::db::build_state().await;
-    let client = common::redis::setup().await;
+    let p_state = common::db::build_state().await;
+    let pool = p_state.pool.clone();
+    let r_state = common::redis::setup().await;
+    let client = r_state.redis_manager.clone();
 
     //
     handlers::integration_category_repo::children_and_limits(pool.clone()).await;
@@ -14,14 +16,14 @@ async fn master() {
     handlers::integration_product_repo::crud_and_get_by_slug(pool.clone()).await;
     handlers::integration_product_repo::filters_and_cursor_pagination(pool.clone()).await;
     //
-    handlers::integration_redis_json::get_missing_returns_none(client.1.clone()).await;
-    handlers::integration_redis_json::set_get_del_roundtrip(client.1.clone()).await;
+    handlers::integration_redis_json::get_missing_returns_none(client.clone()).await;
+    handlers::integration_redis_json::set_get_del_roundtrip(client.clone()).await;
     //
-    handlers::integration_redis_search::search_by_category_brand_active_and_price(client.1.clone())
+    handlers::integration_redis_search::search_by_category_brand_active_and_price(client.clone())
         .await;
     //
-    handlers::integration_redis_stream::consumer_group_roundtrip(client.1.clone()).await;
-    handlers::integration_redis_stream::publish_appends_to_stream(client.1).await;
+    handlers::integration_redis_stream::consumer_group_roundtrip(client.clone()).await;
+    handlers::integration_redis_stream::publish_appends_to_stream(client).await;
     //
     handlers::integration_variant_repo::cascade_delete_on_product_removal(pool.clone()).await;
     handlers::integration_variant_repo::insert_list_delete_and_sku_conflict(pool).await;

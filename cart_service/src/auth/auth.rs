@@ -87,7 +87,7 @@ where
 
         if std::env::var("TEST_MODE").is_ok() {
             return Box::pin(async move {
-                let fake_user_id = uuid::Uuid::new_v4().to_string();
+                let fake_user_id = uuid::Uuid::now_v7().to_string();
 
                 let data = AccessToken {
                     user_id: fake_user_id,

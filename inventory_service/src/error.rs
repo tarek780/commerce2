@@ -48,7 +48,7 @@ impl From<InventoryError> for Status {
                 Status::internal("database error")
             }
 
-            InventoryError::UUID(e) => Status::internal("uuid error"),
+            InventoryError::UUID(_e) => Status::internal("uuid error"),
         }
     }
 }

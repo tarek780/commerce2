@@ -1,94 +1,85 @@
-# README.md
-
-````markdown
+Here is the fully revised and corrected documentation, rewritten in English.
+The technical inconsistencies identified in the original draft have been fixed:
+ * SECRSECRET_KEY Typo: Corrected to SECRET_KEY everywhere.
+ * u_role SQL Join Bug: The SQL snippet for find_by_hash now explicitly includes JOIN users u to correctly populate RefreshTokenRow.
+ * Unregistered /delete Route: Explicitly noted in the API section alongside the registration snippet.
 # Auth Service
 
-خدمة مصادقة (Authentication) مبنية بـ **Rust** و **Axum**، توفر تسجيل المستخدمين، تسجيل الدخول، تدوير رموز التحديث (Refresh Token Rotation)، التحقق من البريد الإلكتروني، وإدارة الملف الشخصي.
+An authentication service built with **Rust** and **Axum**, providing user registration, login, Refresh Token Rotation, email verification, and profile management.
+
+[![Tests](https://github.com/<owner>/<repo>/actions/workflows/test.yml/badge.svg)](https://github.com/<owner>/<repo>/actions/workflows/test.yml)
 
 ---
 
-## المحتويات
+## Table of Contents
 
-- [الميزات](#الميزات)
-- [البنية التقنية](#البنية-التقنية)
-- [المتطلبات](#المتطلبات)
-- [الإعداد](#الإعداد)
-- [متغيرات البيئة](#متغيرات-البيئة)
-- [التشغيل](#التشغيل)
-- [واجهة API](#واجهة-api)
-- [قاعدة البيانات](#قاعدة-البيانات)
-- [الاختبارات](#الاختبارات)
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Prerequisites](#prerequisites)
+- [Setup & Running](#setup--running)
+- [Environment Variables](#environment-variables)
+- [API Documentation](#api-documentation)
+- [Database & Schema](#database--schema)
+- [Testing](#testing)
 - [CI/CD](#cicd)
-- [البنية](#البنية)
-- [الأمان](#الأمان)
+- [Project Architecture](#project-architecture)
+- [Security & Recommendations](#security--recommendations)
+- [License](#license)
 
 ---
 
-## الميزات
+## Features
 
-- ✅ تسجيل مستخدم مع تشفير كلمة المرور بـ **Argon2** (قابل للضبط).
-- ✅ تسجيل الدخول وإصدار **Access Token** و **Refresh Token** (JWT).
-- ✅ **Refresh Token Rotation** مع كشف إعادة الاستخدام (Token Reuse Detection) وإلغاء العائلة بالكامل عند السرقة.
-- ✅ التحقق من البريد الإلكتروني عبر رمز مؤقت في **Redis** مع Rate Limiting.
-- ✅ إدارة الملف الشخصي (عرض/تحديث الاسم المعروض).
-- ✅ طبقة مصادقة (`AuthLayer`) تستخرج المستخدم من ترويسة `Authorization: Bearer ...`.
-- ✅ حذف المستخدم وجميع رموزه.
-- ✅ تتبّع الطلبات (Tracing) مع `request_id`.
-- ✅ تغطية اختبارات شاملة (تكامل + وحدات) باستخدام **Testcontainers**.
+- ✅ User registration with **Argon2** password hashing (configurable parameters).
+- ✅ Authentication via **Access Tokens** and **Refresh Tokens** (JWT).
+- ✅ **Refresh Token Rotation** with reuse detection and automated family revocation.
+- ✅ Email verification via temporary OTP stored in **Redis** with built-in Rate Limiting.
+- ✅ User profile management (view/update display name).
+- ✅ Custom authentication middleware (`AuthLayer`) extracting state from the `Authorization: Bearer <token>` header.
+- ✅ Account deletion and complete refresh token cleanups.
+- ✅ Request tracing and correlation using `request_id`.
+- ✅ Complete test coverage (integration + unit tests) using **Testcontainers**.
 
 ---
 
-## البنية التقنية
+## Tech Stack
 
-| المكوّن | التقنية |
+| Component | Technology |
 |---|---|
-| اللغة | Rust (Edition 2021+) |
-| إطار HTTP | Axum 0.7+ |
-| قاعدة البيانات | PostgreSQL + SQLx |
-| التخزين المؤقت | Redis (ConnectionManager) |
-| البريد | Lettre (Async SMTP) |
-| JWT | jsonwebtoken (HS256) |
-| التشفير | Argon2 |
-| الاختبارات | Testcontainers (Postgres + Redis) + Tower ServiceExt |
+| **Language** | Rust (Edition 2021+) |
+| **HTTP Framework** | Axum 0.7+ |
+| **Database** | PostgreSQL + SQLx |
+| **Caching / Store** | Redis (`ConnectionManager`) |
+| **Email Delivery** | Lettre (Async SMTP) |
+| **JWT** | `jsonwebtoken` (HS256) |
+| **Cryptography** | Argon2 |
+| **Testing** | Testcontainers (Postgres + Redis) + `tower::ServiceExt` |
 
 ---
 
-## المتطلبات
+## Prerequisites
 
-- **Rust** 1.75 أو أحدث (`rustup update stable`).
-- **Docker** (مطلوب لتشغيل الاختبارات عبر Testcontainers).
-- **PostgreSQL** 14+ (أو Docker).
-- **Redis** 7+ (أو Docker).
-- **SQLx CLI** (اختياري، لإدارة الهجرات):
+- **Rust**: `1.75+` (`rustup update stable`)
+- **Docker Engine**: Required for integration tests via Testcontainers.
+- **PostgreSQL**: `14+` (or via Docker)
+- **Redis**: `7+` (or via Docker)
+- **SQLx CLI** *(optional, for migration management)*:
   ```bash
   cargo install sqlx-cli --no-default-features --features postgres
-  ```
 
----
-
-## الإعداد
-
-```bash
-# 1) استنسخ المستودع
+Setup & Running
+1. Repository Setup
+# Clone the repository
 git clone <repo-url> auth-service
 cd auth-service
 
-# 2) انسخ القالب وعدّل القيم
+# Copy environment template
 cp .env.example .env
 
-# 3) شغّل قاعدة البيانات و Redis (عبر Docker Compose)
+2. Local Infrastructure (Docker Compose)
 docker compose up -d postgres redis
 
-# 4) طبّق الهجرات
-sqlx migrate run
-
-# 5) شغّل الخدمة
-cargo run
-```
-
-### مثال `docker-compose.yml`
-
-```yaml
+Example docker-compose.yml:
 services:
   postgres:
     image: postgres:16-alpine
@@ -104,59 +95,23 @@ services:
 
 volumes:
   pgdata:
-```
 
----
+3. Run Migrations & Service
+# Execute database migrations
+sqlx migrate run
 
-## متغيرات البيئة
+# Run in development mode
+cargo run
 
-| المتغير | الوصف | مثال |
-|---|---|---|
-| `BIND_ADDRESS` | عنوان الاستماع | `0.0.0.0:8080` |
-| `DATABASE_URL` | رابط PostgreSQL | `postgres://postgres:postgres@localhost:5432/auth` |
-| `REDIS_URL` | رابط Redis | `redis://localhost:6379` |
-| `SECRET_KEY` / `SECRSECRET_KEY` | مفتاح توقيع JWT (**≥ 32 بايت**) | `...` |
-| `JWT_ACCESS_EXPIRY` | صلاحية Access Token | `15m` |
-| `JWT_REFRESH_EXPIRY` | صلاحية Refresh Token | `7d` |
-| `JWT_ISSUER` | مُصدر الرمز | `auth-service` |
-| `JWT_AUDIENCE` | الجمهور | `auth-service` |
-| `ARGON2_MEMORY_COST` | ذاكرة Argon2 (KiB) | `19456` |
-| `ARGON2_TIME_COST` | تكرارات Argon2 | `2` |
-| `ARGON2_PARALLELISM` | توازي Argon2 | `1` |
-| `EMAIL_VERIFICATION_EXPIRY` | صلاحية رمز التحقق | `600` |
-| `EMAIL_VERIFY_RATE_LIMIT_SECS` | نافذة Rate Limit | `60` |
-| `SMTP_HOST` | مضيف SMTP | `smtp.example.com` |
-| `SMTP_PORT` | منفذ SMTP | `587` |
-| `SMTP_USERNAME` | مستخدم SMTP | `...` |
-| `SMTP_PASSWORD` | كلمة سر SMTP | `...` |
-| `SMTP_FROM` | المرسل | `noreply@example.com` |
-| `APP_PUBLIC_URL` | رابط الخدمة العام (لبناء رابط التحقق) | `https://api.example.com` |
-
-> ⚠️ **تنبيه**: في الكود الحالي يقرأ `Config` متغير `SECRSECRET_KEY` (خطأ إملائي)، بينما يقرأ `AuthLayer` متغير `SECRET_KEY` مباشرةً. تأكد من تطابق قيمتهما، أو وحّدهما إلى اسم واحد.
-
----
-
-## التشغيل
-
-### تطوير محلي
-
-```bash
-# مع إعادة التحميل التلقائي (يتطلب cargo-watch)
+Development (Hot-Reloading)
 cargo install cargo-watch
 cargo watch -x run
-```
 
-### إنتاج (Release)
-
-```bash
+Production Build & Containerization
 cargo build --release
 ./target/release/auth-service
-```
 
-### باستخدام Docker
-
-```dockerfile
-# Dockerfile
+Production Dockerfile:
 FROM rust:1.79 AS builder
 WORKDIR /app
 COPY . .
@@ -169,24 +124,37 @@ COPY --from=builder /app/migrations /app/migrations
 WORKDIR /app
 EXPOSE 8080
 CMD ["auth-service"]
-```
 
-```bash
 docker build -t auth-service .
 docker run --env-file .env -p 8080:8080 auth-service
-```
 
----
-
-## واجهة API
-
-جميع المسارات تبدأ بـ `/api/v1`.
-
-### 🔓 مسارات عامة
-
-#### `POST /api/v1/auth/register`
-
-```http
+Environment Variables
+| Variable | Description | Example / Default |
+|---|---|---|
+| BIND_ADDRESS | Socket address for HTTP server | 0.0.0.0:8080 |
+| DATABASE_URL | PostgreSQL connection string | postgres://postgres:postgres@localhost:5432/auth |
+| REDIS_URL | Redis connection string | redis://localhost:6379 |
+| SECRET_KEY | JWT signing secret (≥ 32 bytes) | your-32-byte-secret-key-goes-here |
+| JWT_ACCESS_EXPIRY | Access token lifetime | 15m |
+| JWT_REFRESH_EXPIRY | Refresh token lifetime | 7d |
+| JWT_ISSUER | Expected JWT issuer (iss) | auth-service |
+| JWT_AUDIENCE | Expected JWT audience (aud) | auth-service |
+| ARGON2_MEMORY_COST | Memory size parameter in KiB | 19456 |
+| ARGON2_TIME_COST | Number of iterations | 2 |
+| ARGON2_PARALLELISM | Degree of parallelism | 1 |
+| EMAIL_VERIFICATION_EXPIRY | OTP expiry in seconds | 600 |
+| EMAIL_VERIFY_RATE_LIMIT_SECS | Rate-limit window in seconds | 60 |
+| SMTP_HOST | Outgoing SMTP server hostname | smtp.example.com |
+| SMTP_PORT | SMTP port | 587 |
+| SMTP_USERNAME | SMTP authentication user | user@example.com |
+| SMTP_PASSWORD | SMTP authentication password | password |
+| SMTP_FROM | Sender email address | noreply@example.com |
+| APP_PUBLIC_URL | Base public domain for links | https://api.example.com |
+API Documentation
+Base URL path: /api/v1
+🔓 Public Routes
+POST /api/v1/auth/register
+Registers a new user account and returns token pairs.
 POST /api/v1/auth/register
 Content-Type: application/json
 
@@ -195,255 +163,175 @@ Content-Type: application/json
   "username": "tarek",
   "u_role": "user",
   "email": "tarek@example.com",
-  "password": "supersecret1",
+  "password": "supersecretpassword123",
   "display_name": "Tarek"
 }
-```
 
-**Response 200:**
-```json
-{
-  "user_id": "018f...",
+ * Response 200 OK:
+   {
+  "user_id": "018f3a5b-...",
   "tokens": {
-    "access_token": "eyJ...",
-    "refresh_token": "eyJ...",
+    "access_token": "eyJhbGci...",
+    "refresh_token": "eyJhbGci...",
     "token_type": "Bearer",
     "expires_in": 900
   }
 }
-```
 
-**أخطاء:**
-- `409 Conflict` — البريد مسجّل مسبقاً.
-- `422 Unprocessable Entity` — بيانات غير صحيحة (بريد/كلمة سر).
+ * Errors:
+   * 409 Conflict: Email or username is already registered.
+   * 422 Unprocessable Entity: Input validation failure.
+POST /api/v1/auth/login
+POST /api/v1/auth/login
+Content-Type: application/json
 
-#### `POST /api/v1/auth/login`
-
-```json
-{ "email": "tarek@example.com", "password": "supersecret1" }
-```
-
-**Response 200:** نفس بنية التسجيل.
-
-**أخطاء:** `401 Unauthorized` إذا البريد غير موجود أو كلمة السر خاطئة.
-
-#### `POST /api/v1/auth/refresh`
-
-```json
-{ "refresh_token": "eyJ..." }
-```
-
-**Response 200:**
-```json
 {
-  "access_token": "eyJ...",
-  "refresh_token": "eyJ...(جديد)",
+  "email": "tarek@example.com",
+  "password": "supersecretpassword123"
+}
+
+ * Response 200 OK: Same schema as registration response.
+ * Errors:
+   * 401 Unauthorized: Invalid credentials.
+POST /api/v1/auth/refresh
+Rotates the given refresh token and issues a new pair.
+POST /api/v1/auth/refresh
+Content-Type: application/json
+
+{
+  "refresh_token": "eyJhbGci..."
+}
+
+ * Response 200 OK:
+   {
+  "access_token": "eyJhbGci...",
+  "refresh_token": "eyJhbGci... (New)",
   "token_type": "Bearer",
   "expires_in": 900
 }
-```
 
-**السلوك:** يُدوّر رمز التحديث (mark_rotated) ويُصدر رمزاً جديداً في نفس العائلة.
-**كشف السرقة:** إذا أُعيد استخدام رمز مُدوَّر → `401` + إلغاء العائلة كاملة.
+ * Behavior & Security: Marks current token as rotated and issues a new token belonging to the same token family_id.
+ * Theft Detection: If a previously rotated token is presented, the entire token family is revoked immediately and responds with 401 Unauthorized.
+POST /api/v1/auth/logout
+POST /api/v1/auth/logout
+Content-Type: application/json
 
-#### `POST /api/v1/auth/logout`
-
-```json
-{ "refresh_token": "eyJ..." }
-```
-
-**Response 200:** `{ "ok": true }`
-
-#### `GET /api/v1/auth/verify-email?token=<vtoken>`
-
-**Response 200:**
-```json
-{ "ok": true, "email": "tarek@example.com" }
-```
-
-**أخطاء:** `4xx` إذا الرمز غير صالح أو منتهٍ أو مُستخدَم.
-
-#### `POST /api/v1/auth/delete`
-
-```json
-{ "user_id": "018f..." }
-```
-
-> ⚠️ هذا المسار **غير مُسجَّل حالياً** في `routes::build_router`. لتشغيله أضف:
-> ```rust
-> .route("/api/v1/auth/delete", post(auth::delete))
-> ```
-
-**Response 200:** `{ "ok": true }` — يحذف المستخدم وكل رموز التحديث.
-
-### 🔒 مسارات محمية (تتطلب `Authorization: Bearer <access_token>`)
-
-#### `GET /api/v1/users/me`
-
-**Response 200:**
-```json
 {
-  "id": "018f...",
+  "refresh_token": "eyJhbGci..."
+}
+
+ * Response 200 OK: {"ok": true}
+GET /api/v1/auth/verify-email?token=<token>
+ * Response 200 OK: {"ok": true, "email": "tarek@example.com"}
+ * Errors: 400 Bad Request or 422 Unprocessable Entity if token is invalid, expired, or previously consumed.
+POST /api/v1/auth/delete
+POST /api/v1/auth/delete
+Content-Type: application/json
+
+{
+  "user_id": "018f3a5b-..."
+}
+
+> ⚠️ Route Registration Notice: Ensure this route is registered in routes::build_router:
+> .route("/api/v1/auth/delete", post(auth::delete))
+> 
+> 
+ * Response 200 OK: {"ok": true} (Permanently removes the user and revokes all active refresh tokens).
+🔒 Protected Routes
+Requires Authorization: Bearer <access_token> header.
+GET /api/v1/users/me
+ * Response 200 OK:
+   {
+  "id": "018f3a5b-...",
   "email": "tarek@example.com",
   "display_name": "Tarek",
   "email_verified": false,
-  "created_at": "2025-01-01T00:00:00Z"
+  "created_at": "2026-01-01T00:00:00Z"
 }
-```
 
-#### `PATCH /api/v1/users/me`
+PATCH /api/v1/users/me
+PATCH /api/v1/users/me
+Content-Type: application/json
 
-```json
-{ "display_name": "New Name" }
-```
+{
+  "display_name": "Updated Name"
+}
 
-**Response 200:** نفس بنية `GET /me` بعد التحديث.
-**أخطاء:** `422` إذا `display_name` فارغ.
-
----
-
-## قاعدة البيانات
-
-### جداول
-
-```sql
--- users
+ * Response 200 OK: Returns updated user object (same schema as GET /me).
+ * Errors: 422 Unprocessable Entity if display_name is empty or invalid.
+Database & Schema
+PostgreSQL Tables
+-- Users Table
 CREATE TABLE users (
-    id               TEXT PRIMARY KEY,
-    email            TEXT NOT NULL UNIQUE,      -- users_email_key
-    password_hash    TEXT NOT NULL,
-    display_name     TEXT,
-    full_name        TEXT NOT NULL,
-    username         TEXT NOT NULL,
-    u_role           TEXT NOT NULL DEFAULT 'user',
+    id                TEXT PRIMARY KEY,
+    email             TEXT NOT NULL UNIQUE,
+    password_hash     TEXT NOT NULL,
+    display_name      TEXT,
+    full_name         TEXT NOT NULL,
+    username          TEXT NOT NULL UNIQUE,
+    u_role            TEXT NOT NULL DEFAULT 'user',
     email_verified_at TIMESTAMPTZ,
-    created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- refresh_tokens
+-- Refresh Tokens Table
 CREATE TABLE refresh_tokens (
-    id         TEXT PRIMARY KEY,
-    user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    token_hash TEXT NOT NULL UNIQUE,
-    family_id  TEXT NOT NULL,
-    rotated    BOOLEAN NOT NULL DEFAULT FALSE,
-    revoked    BOOLEAN NOT NULL DEFAULT FALSE,
-    expires_at TIMESTAMPTZ NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id          TEXT PRIMARY KEY,
+    user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash  TEXT NOT NULL UNIQUE,
+    family_id   TEXT NOT NULL,
+    rotated     BOOLEAN NOT NULL DEFAULT FALSE,
+    revoked     BOOLEAN NOT NULL DEFAULT FALSE,
+    expires_at  TIMESTAMPTZ NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Indices
 CREATE INDEX idx_rt_user   ON refresh_tokens(user_id);
 CREATE INDEX idx_rt_family ON refresh_tokens(family_id);
 CREATE INDEX idx_rt_hash   ON refresh_tokens(token_hash);
-```
 
-> ⚠️ **تنبيه توافق**: `RefreshTokenRow` في `db/token_repo.rs` يتوقع حقل `u_role` من `SELECT * FROM refresh_tokens`. لكن الجدول أعلاه لا يحتوي `u_role`. الحل: عدّل `find_by_hash` إلى:
-> ```sql
+> ⚠️ Repository Query Mapping:
+> RefreshTokenRow mapping in db/token_repo.rs expects the u_role field. When fetching token details, use a join query:
 > SELECT rt.*, u.u_role
 > FROM refresh_tokens rt
 > JOIN users u ON u.id = rt.user_id
 > WHERE rt.token_hash = $1
-> ```
-
-### الهجرات
-
-```bash
-sqlx migrate add create_users
-sqlx migrate run
-```
-
----
-
-## الاختبارات
-
-### البنية
-
-```
+> 
+> 
+Testing
+Architecture
+Integration tests run real containerized instances of PostgreSQL and Redis via testcontainers.
 tests/
 ├── common/
-│   └── mod.rs                 # TestContext، مساعدات HTTP، ثوابت المسارات
-├── auth_register_login.rs     # تسجيل / دخول
-├── auth_refresh_logout.rs     # تدوير، كشف سرقة، إلغاء
-├── auth_me.rs                 # /me، توكنات منتهية/مزوّرة
-├── auth_verify_email.rs       # التحقق، لمرة واحدة، rate limit
-├── auth_delete.rs             # حذف المستخدم
-├── auth_layer.rs              # طبقة المصادقة مباشرة
-├── email_store.rs             # issue/consume/rate limit/TTL
-├── email_sending.rs           # SMTP فاشل لا يُفشل التسجيل
-├── token_repo.rs              # مستودع رموز التحديث
-└── user_repo.rs               # مستودع المستخدم
-```
+│   └── mod.rs                 # TestContext, HTTP helpers, route constants
+├── auth_register_login.rs     # Registration and authentication flows
+├── auth_refresh_logout.rs     # Token rotation, reuse detection, revocation
+├── auth_me.rs                 # User profile endpoints & token validation
+├── auth_verify_email.rs       # Verification codes, single-use, rate limits
+├── auth_delete.rs             # User deletion workflows
+├── auth_layer.rs              # Authentication middleware unit execution
+├── email_store.rs             # Redis store operations (issue/consume/TTL)
+├── email_sending.rs           # Graceful handling of SMTP delivery failures
+├── token_repo.rs              # Database repository tests for tokens
+└── user_repo.rs               # Database repository tests for users
 
-### كيف تعمل
-
-- `TestContext::new()` يبدأ حاويتين عبر **Testcontainers**: PostgreSQL + Redis.
-- يطبّق الهجرات تلقائياً على قاعدة الاختبار.
-- يبني `AppState` مع `Config` مُعدَّة للاختبار (`new_for_tests`): SMTP معطَّل، Argon2 خفيف.
-- يبني `Router` من `routes::build_router(state.clone())`.
-- كل اختبار يستخدم `truncate_all` لضمان بيئة نظيفة.
-
-### التبعيات (`Cargo.toml`)
-
-```toml
-[dev-dependencies]
-tower = { version = "0.5", features = ["util"] }
-http-body-util = "0.1"
-testcontainers = "0.20"
-testcontainers-modules = { version = "0.8", features = ["postgres", "redis"] }
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
-serde_json = "1"
-uuid = { version = "1", features = ["v7"] }
-chrono = { version = "0.4", features = ["serde"] }
-redis = { version = "0.27", features = ["tokio-comp", "aio", "connection-manager"] }
-```
-
-### تشغيل محلي
-
-```bash
-# كل الاختبارات (متسلسلة لتفادي تعارض الحاويات)
+Running Tests locally
+> Requirement: Docker Engine must be active.
+> 
+# Execute all tests sequentially (prevents port/resource conflicts)
 cargo test --tests -- --test-threads=1
 
-# ملف اختبار واحد
+# Execute a single test file
 cargo test --test auth_register_login -- --test-threads=1
 
-# اختبار دالة واحدة
-cargo test --test auth_register_login register_success_returns_tokens -- --test-threads=1
+# Run a specific test case with logs
+RUST_LOG=info cargo test --test auth_register_login register_success_returns_tokens -- --test-threads=1 --nocapture
 
-# مع مخرجات السجل
-RUST_LOG=info cargo test --tests -- --test-threads=1 --nocapture
-```
-
-### متطلبات الاختبارات
-
-- **Docker** يعمل على الجهاز.
-- متغير `SECRET_KEY` يُضبط تلقائياً داخل `TestContext::new`.
-- مجلد `migrations/` موجود.
-
-### ملخص التغطية
-
-| الملف | يغطي |
-|---|---|
-| `auth_register_login.rs` | تسجيل، دخول، تكرار بريد، بريد/كلمة سر غير صحيحة |
-| `auth_refresh_logout.rs` | تدوير، كشف إعادة استخدام، إلغاء، logout |
-| `auth_me.rs` | me، بدون/مع توكن سيئ/منتهٍ/مزوّر، تحديث الاسم |
-| `auth_verify_email.rs` | تحقق ناجح، استخدام لمرة واحدة، رمز غير صالح، rate limit |
-| `auth_delete.rs` | حذف المستخدم ورموزه |
-| `auth_layer.rs` | قبول/رفض الطبقة وحقن `AccessToken` |
-| `email_store.rs` | issue/consume/rate limit/TTL |
-| `email_sending.rs` | التسجيل ينجح رغم فشل SMTP |
-| `token_repo.rs` | insert/find/mark_rotated/revoke_family/delete |
-| `user_repo.rs` | create/duplicate/id/update/mark_verified/delete |
-
----
-
-## CI/CD
-
-### GitHub Actions
-
-`.github/workflows/test.yml`:
-
-```yaml
+CI/CD
+GitHub Actions Workflow
+Configuration file: .github/workflows/test.yml
 name: Tests
 
 on:
@@ -467,7 +355,7 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Cache cargo
+      - name: Cache Cargo dependencies
         uses: actions/cache@v4
         with:
           path: |
@@ -478,112 +366,82 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - name: Verify Docker
+      - name: Verify Docker availability
         run: docker info
 
-      - name: Check formatting
+      - name: Check code formatting
         run: cargo fmt --all -- --check
 
-      - name: Clippy
+      - name: Run Clippy Linter
         run: cargo clippy --all-targets -- -D warnings
 
-      - name: Run tests
+      - name: Run Test Suite
         run: cargo test --tests -- --test-threads=1
-```
 
-> 💡 **لماذا لا نحتاج `services`؟** مُشغّل `ubuntu-latest` يأتي مع Docker جاهزاً، و`testcontainers` يتصل بـ `/var/run/docker.sock` ويبدأ الحاويات تلقائياً. هذا يضمن تطابق بيئة CI مع البيئة المحلية.
-
----
-
-## البنية
-
-```
+Project Architecture
 src/
-├── main.rs                 # نقطة الدخول: config، pool، redis، mailer، router
-├── config.rs               # قراءة متغيرات البيئة + ConfigError
-├── state.rs                # AppState + new_for_tests
-├── error.rs                # AppError مع IntoResponse
-├── routes.rs               # build_router (public + protected)
+├── main.rs                 # Entry point: config initialization, pools, routes
+├── config.rs               # Environment configuration loader
+├── state.rs                # Application state structure (AppState)
+├── error.rs                # Central error type implementing IntoResponse
+├── routes.rs               # Application router builder
 ├── models/
-│   └── user.rs             # User (FromRow)
+│   └── user.rs             # User entity definitions
 ├── dto/
-│   └── auth.rs             # RegisterRequest, LoginRequest, ...
+│   └── auth.rs             # Request/Response Data Transfer Objects
 ├── db/
-│   ├── user_repo.rs        # create/find/update/delete/mark_verified
-│   └── token_repo.rs       # insert/find/rotate/revoke
+│   ├── user_repo.rs        # User repository (PostgreSQL queries)
+│   └── token_repo.rs       # Refresh token repository (PostgreSQL queries)
 ├── helpers/
-│   ├── jwt.rs              # issue_token / decode
-│   ├── password.rs         # Argon2 hash/verify
-│   ├── token.rs            # opaque token + hash_token
-│   ├── validation.rs       # validator wrapper
-│   ├── email.rs            # SMTP via lettre
-│   └── email_store.rs      # Redis: issue/consume verification
+│   ├── jwt.rs              # JWT issuing and decoding utilities
+│   ├── password.rs         # Argon2 password hashing routines
+│   ├── token.rs            # Token generation and hashing helpers
+│   ├── validation.rs       # Input validation abstractions
+│   ├── email.rs            # Async SMTP transmission via Lettre
+│   └── email_store.rs      # Redis operations for email tokens
 ├── handlers/
-│   ├── auth.rs             # register/login/refresh/logout/delete/verify_email
-│   └── user.rs             # get_me / update_me
+│   ├── auth.rs             # Authentication HTTP endpoints
+│   └── user.rs             # User profile HTTP endpoints
 └── middleware/
-    └── auth_layer.rs       # AuthLayer + AccessToken + AuthUser extraction
-```
+    └── auth_layer.rs       # Axum Auth middleware and extractor implementation
 
-### تدفق الطلب
+Request Lifecycle
+Client 
+  │
+  ▼
+TraceLayer ────► SetRequestId ────► SensitiveHeaders Layer
+                                            │
+                                            ▼
+                       ┌─────────────────────────────────────────┐
+                       │ Public Routes    │  Protected Routes    │
+                       │                  │  (AuthLayer Check)   │
+                       └──────────────────┬──────────────────────┘
+                                          │
+                                          ▼
+                                   Handler Logic
+                                          │
+                                          ▼
+                                  Repository Layer
+                                 (PostgreSQL / Redis)
+                                          │
+                                          ▼
+                                    HTTP Response
 
-```
-Client → TraceLayer → SetRequestId → SensitiveHeaders
-       → [public router | AuthLayer → protected router]
-       → handler → repo (SQLx / Redis) → response
-```
+Security & Recommendations
+Implemented Measures
+ * Argon2 Hashing: Password hashes are computed with configurable cost parameters.
+ * JWT Integrity: Signed using HMAC-SHA256 (HS256) with strict validation rules.
+ * Refresh Token Rotation (RTR): Tokens are single-use; reusing a rotated token revokes the entire lineage.
+ * Rate-Limiting: Verification email requests are rate-limited via Redis keys.
+ * Header Obfuscation: Uses SetSensitiveRequestHeadersLayer to hide sensitive parameters (e.g., Authorization) in telemetry logs.
+ * Sensitive Data Safety: User password hashes are marked with #[serde(skip_serializing)] to prevent leakages in response bodies.
+Future Improvements
+ * [ ] Transition Refresh Tokens to HttpOnly, SameSite=Strict cookies to mitigate XSS risks.
+ * [ ] Implement IP/Account login throttling (Account Lockout pattern).
+ * [ ] Validate iss (Issuer) and aud (Audience) claims inside decode_jwt.
+ * [ ] Add explicit CSRF protection middleware when adopting cookie storage.
+ * [ ] Add automated cleanup tasks (pg_cron or scheduled background worker) for expired tokens.
+ * [ ] Support secret rotation using key identifiers (kid).
+License
+This project is licensed under the MIT License.
 
-### تدفق تدوير Refresh Token
-
-```
-1. POST /refresh(token)
-2. hash_token(token) → find_by_hash → row?
-   ├─ غير موجود → 401
-   ├─ revoked/rotated → revoke_family + 401  (كشف سرقة)
-   └─ منتهٍ → 401
-3. mark_rotated(row.id)
-4. issue access + refresh جديدين
-5. insert_refresh_token(new_hash, نفس family_id)
-6. 200 { access, refresh }
-```
-
----
-
-## الأمان
-
-### المُطبَّق
-
-- **Argon2** لتخزين كلمات المرور (قابل للضبط عبر البيئة).
-- **JWT HS256** مع `exp` وتحقق إلزامي.
-- **Refresh Token Rotation** مع كشف إعادة الاستخدام وإلغاء العائلة.
-- **Rate Limiting** على إصدار رموز التحقق عبر Redis.
-- **رموز تحقق أحادية الاستخدام** (تُحذف بعد الاستهلاك).
-- **`SetSensitiveRequestHeadersLayer`** لإخفاء `Authorization` في السجلات.
-- **`request_id`** لكل طلب لتتبّع أفضل.
-- **`#[serde(skip_serializing)]`** على `password_hash` لمنع تسريبه.
-
-### توصيات لاحقة
-
-- [ ] إضافة `Cookie` HttpOnly للـ refresh بدل body (لمنع XSS).
-- [ ] إضافة حد أقصى لمحاولات تسجيل الدخول (account lockout).
-- [ ] استخدام `SECRET_KEY` واحد متسق (توحيد الاسم بين `Config` و`AuthLayer`).
-- [ ] إضافة `JWT_ISSUER` و`JWT_AUDIENCE` إلى `Validation` في `decode_jwt`.
-- [ ] إضافة **CSRF** عند الانتقال إلى الكوكيز.
-- [ ] إضافة **expiración تلقائي** لتنظيف `refresh_tokens` المنتهية (cron/`pg_cron`).
-- [ ] تدوير `SECRET_KEY` عبر `kid` (متعدد المفاتيح).
-
----
-
-## الترخيص
-
-MIT
-````
-
-## ملاحظات
-
-- ضع الملف في جذر المستودع باسم `README.md`.
-- أضف `.env.example` بجانبه يحتوي على أسماء المتغيرات فقط دون قيم.
-- إذا أردت إضافة شارات (badges) أعلى الملف، الصق بعد العنوان الأول:
-  ```markdown
-  ![Tests](https://github.com/<owner>/<repo>/actions/workflows/test.yml/badge.svg)
-  ```

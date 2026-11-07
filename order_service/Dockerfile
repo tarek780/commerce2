@@ -2,15 +2,7 @@ FROM rust:1.99.1-slim-trixie AS builder
 WORKDIR /usr/src/app
 
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    protobuf-compiler \
-    libssl-dev \
-    pkg-config \
-    curl \
-    ca-certificates \
-    cmake \
-    g++ \
-    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends \     protobuf-compiler \     libssl-dev \     pkg-config \     curl \     ca-certificates \     cmake \     g++ \     make \     && rm -rf /var/lib/apt/lists/* 
 
 
 COPY Cargo.toml Cargo.lock ./
@@ -32,11 +24,7 @@ RUN --mount=type=cache,id=order_service-cargo-registry,target=/usr/local/cargo/r
 
 FROM debian:trixie-slim
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    libssl3 \
-    && rm -rf /var/lib/apt/lists/*
-
+RUN apt-get update && apt-get install -y --no-install-recommends \     ca-certificates \     libssl3t64 \     && rm -rf /var/lib/apt/lists/* 
 
 COPY --from=builder /usr/local/bin/order_service /usr/local/bin/order_service
 
